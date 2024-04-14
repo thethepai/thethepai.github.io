@@ -11,7 +11,7 @@
 <meta property="og:url" content="http://thethepai.github.io/index.html">
 <meta property="og:site_name" content="PaiBLOG">
 <meta property="og:locale" content="en_US">
-<meta property="article:author" content="John Doe">
+<meta property="article:author" content="jackpai">
 <meta name="twitter:card" content="summary">
   
     <link rel="alternate" href="/atom.xml" title="PaiBLOG" type="application/atom+xml">
@@ -41,6 +41,10 @@
       <h1 id="logo-wrap">
         <a href="/" id="logo">PaiBLOG</a>
       </h1>
+      
+        <h2 id="subtitle-wrap">
+          <a href="/" id="subtitle">PaiBLOG</a>
+        </h2>
       
     </div>
     <div id="header-inner" class="inner">
@@ -83,7 +87,7 @@
         
   
     <h1 itemprop="name">
-      <a class="p-name article-title" href="/2024/04/14/new-post/">new post</a>
+      <a class="p-name article-title" href="/2024/04/14/new-post/">VPD test</a>
     </h1>
   
 
@@ -91,11 +95,59 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        
+        <h1 id="演示示例"><a href="#演示示例" class="headerlink" title="演示示例"></a>演示示例</h1><p>测试自用</p>
+<h2 id="常用写法"><a href="#常用写法" class="headerlink" title="常用写法"></a>常用写法</h2><p>上下文函数，用于行级安全谓词</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">CREATE OR REPLACE FUNCTION EMP_ACCESS_FUNCTION (</span><br><span class="line">  schema_var IN VARCHAR2,</span><br><span class="line">  table_var  IN VARCHAR2</span><br><span class="line">)</span><br><span class="line">RETURN VARCHAR2</span><br><span class="line">IS</span><br><span class="line">  predicate VARCHAR2(200);</span><br><span class="line">BEGIN</span><br><span class="line">  IF USER IN (&#x27;HR_EMPLOYEE&#x27;) THEN</span><br><span class="line">    predicate := &#x27;1=1&#x27;; -- 人力资源部门员工可以访问所有数据</span><br><span class="line">  ELSE</span><br><span class="line">    predicate := &#x27;DEPARTMENT = SYS_CONTEXT(&#x27;&#x27;USERENV&#x27;&#x27;, &#x27;&#x27;CURRENT_USER&#x27;&#x27;)&#x27;; -- 其他部门员工只能访问自己部门的数据</span><br><span class="line">  END IF;</span><br><span class="line">  RETURN predicate;</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
+
+<p>定义安全策略</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">BEGIN</span><br><span class="line">  DBMS_RLS.ADD_POLICY(</span><br><span class="line">    object_schema   =&gt; &#x27;HR&#x27;,</span><br><span class="line">    object_name     =&gt; &#x27;EMPLOYEES&#x27;,</span><br><span class="line">    policy_name     =&gt; &#x27;EMP_ACCESS_POLICY&#x27;,</span><br><span class="line">    function_schema =&gt; &#x27;HR&#x27;,</span><br><span class="line">    policy_function =&gt; &#x27;EMP_ACCESS_FUNCTION&#x27;,</span><br><span class="line">    statement_types =&gt; &#x27;SELECT&#x27;</span><br><span class="line">  );</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
+
+<h2 id="模拟程序示例"><a href="#模拟程序示例" class="headerlink" title="模拟程序示例"></a>模拟程序示例</h2><p>讲解配文</p>
+<h3 id="行级访问限制"><a href="#行级访问限制" class="headerlink" title="行级访问限制"></a>行级访问限制</h3><p>策略函数部分：</p>
+<ul>
+<li>行级访问限制中，一般通过一些数据库函数如sys_context获得当前会话的用户名</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CREATE OR REPLACE FUNCTION func0()&#123;return user01;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>DBMS_RLS包：</p>
+<ul>
+<li>模式名，选择表的所有者sys</li>
+<li>填入表名，策略名称</li>
+<li>策略函数模式名，系统用户名sys</li>
+<li>策略函数选择刚才编写的func0</li>
+<li>应用的关键字通常选择SELECT</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">BEGIN</span><br><span class="line">  DBMS_RLS.ADD_POLICY(</span><br><span class="line">    object_schema   =&gt;sys</span><br><span class="line">    object_name     =&gt;list</span><br><span class="line">    policy_name     =&gt;test01</span><br><span class="line">    function_schema =&gt;sys</span><br><span class="line">    policy_function =&gt;func0</span><br><span class="line">    statement_types =&gt;SELECT</span><br><span class="line">  );</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
+
+<p>SQL语句输入：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">SELECT * FROM list</span><br><span class="line">SELECT id FROM list WHERE sal&gt;200</span><br><span class="line">SELECT id FROM list WHERE sal&gt;200 ORDER BY sal</span><br></pre></td></tr></table></figure>
+
+<h3 id="列访问限制"><a href="#列访问限制" class="headerlink" title="列访问限制"></a>列访问限制</h3><p>策略函数部分：</p>
+<ul>
+<li>列访问限制中，一般返回NULL或布尔值，比如1&#x3D;0表达式表示false</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CREATE OR REPLACE FUNCTION func0()&#123;return 1=0;&#125;</span><br></pre></td></tr></table></figure>
+
+<p>DBMS_RLS包</p>
+<ul>
+<li>与之前类似，写好对应参数</li>
+<li>填上sec_relevant_cols，比如限制id字段</li>
+<li>sec_relevant_cols_opt，填写all_row表示对所有行都限制</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">BEGIN</span><br><span class="line">  DBMS_RLS.ADD_POLICY(</span><br><span class="line">    object_schema   =&gt;sys</span><br><span class="line">    object_name     =&gt;list</span><br><span class="line">    policy_name     =&gt;test01</span><br><span class="line">    function_schema =&gt;sys</span><br><span class="line">    policy_function =&gt;func0</span><br><span class="line">    statement_types =&gt;SELECT</span><br><span class="line">    sec_relevant_cols =&gt;id</span><br><span class="line">    sec_relevant_cols_opt =&gt;dbms_rls.all_row</span><br><span class="line">  );</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
+
+<p>SQL语句输入</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">SELECT id,sal,name FROM list WHERE sal&gt;200</span><br><span class="line">SELECT id FROM list WHERE sal&gt;200</span><br></pre></td></tr></table></figure>
+
+<h2 id="编码实现"><a href="#编码实现" class="headerlink" title="编码实现"></a>编码实现</h2><figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">VPDPolicy</span> &#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">	<span class="type">int</span> policyType;</span><br><span class="line">    <span class="type">int</span> groupedLength;</span><br><span class="line">    </span><br><span class="line">	<span class="type">bool</span> enable;</span><br><span class="line">    <span class="type">bool</span> groupEnable;</span><br><span class="line">	<span class="type">bool</span> updateCheck;</span><br><span class="line">    <span class="type">bool</span> ifGrouped;</span><br><span class="line">    <span class="type">bool</span> validateRes;</span><br><span class="line"></span><br><span class="line">	string policySqlEdit;</span><br><span class="line"></span><br><span class="line">	string objectSchema;</span><br><span class="line">	string objectName;</span><br><span class="line">	string policyName;</span><br><span class="line">	string functionSchema;</span><br><span class="line">	string policyFunction;</span><br><span class="line">	string statementTypes;</span><br><span class="line"></span><br><span class="line">	string secRelevantCols;</span><br><span class="line">	string secRelevantColsOpt;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">	<span class="built_in">VPDPolicy</span>() :<span class="built_in">policyType</span>(<span class="number">0</span>), <span class="built_in">enable</span>(<span class="literal">true</span>), <span class="built_in">updateCheck</span>(<span class="literal">true</span>) &#123;</span><br><span class="line">		Tool::<span class="built_in">addPolicy</span>(policy);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	~<span class="built_in">VPDPolicy</span>() &#123;</span><br><span class="line">		Tool::<span class="built_in">dropPolicy</span>(policy);</span><br><span class="line">	&#125;</span><br><span class="line">......    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">DBMS_RLS</span> &#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">DBMS_RLS</span>() &#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;准备添加或编辑策略...&quot;</span> &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addPolicy</span><span class="params">(VPDPolicy&amp; vpdPolicy, string policyOriginalName)</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;添加策略：&quot;</span> &lt;&lt; vpdPolicy.<span class="built_in">showName</span>() &lt;&lt; endl;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">enablePolicy</span><span class="params">(VPDPolicy&amp; policy)</span> </span>&#123;</span><br><span class="line">        policy.<span class="built_in">activate</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">disablePolicy</span><span class="params">(VPDPolicy&amp; policy)</span> </span>&#123;</span><br><span class="line">        policy.<span class="built_in">deactivate</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">evaluatePolicy</span><span class="params">(VPDPolicy&amp; policy)</span> </span>&#123;&#125;</span><br><span class="line">	......</span><br><span class="line">	<span class="function"><span class="type">void</span> <span class="title">alterPolicy</span><span class="params">(VPDPolicy&amp; policy)</span> </span>&#123;&#125;</span><br><span class="line">......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://thethepai.github.io/2024/04/14/new-post/" data-id="cluzk1hq600000gvi5ebn61dw" data-title="new post" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://thethepai.github.io/2024/04/14/new-post/" data-id="cluzk1hq600000gvi5ebn61dw" data-title="VPD test" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
@@ -189,7 +241,7 @@
       <ul>
         
           <li>
-            <a href="/2024/04/14/new-post/">new post</a>
+            <a href="/2024/04/14/new-post/">VPD test</a>
           </li>
         
           <li>
@@ -209,7 +261,7 @@
   <div class="outer">
     <div id="footer-info" class="inner">
       
-      &copy; 2024 John Doe<br>
+      &copy; 2024 jackpai<br>
       Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
     </div>
   </div>
