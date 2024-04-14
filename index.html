@@ -69,9 +69,114 @@
       <div class="outer">
         <section id="main">
   
-    <article id="post-new-post" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+    <article id="post-HyperV-WSL" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
-    <a href="/2024/04/14/new-post/" class="article-date">
+    <a href="/2024/04/14/HyperV-WSL/" class="article-date">
+  <time class="dt-published" datetime="2024-04-14T13:46:57.000Z" itemprop="datePublished">2024-04-14</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2024/04/14/HyperV-WSL/">HyperV/WSL</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>简单的使用与原理介绍</p>
+<h2 id="家庭版windows开启hyper-v功能"><a href="#家庭版windows开启hyper-v功能" class="headerlink" title="家庭版windows开启hyper-v功能"></a>家庭版windows开启hyper-v功能</h2><p>新建文件Hyper-V.cmd如下：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">pushd &quot;%~dp0&quot;</span><br><span class="line"></span><br><span class="line">dir /b %SystemRoot%\servicing\Packages\*Hyper-V*.mum &gt;hyper-v.txt</span><br><span class="line"></span><br><span class="line">for /f %%i in (&#x27;findstr /i . hyper-v.txt 2^&gt;nul&#x27;) do dism /online /norestart /add-package:&quot;%SystemRoot%\servicing\Packages\%%i&quot;</span><br><span class="line"></span><br><span class="line">del hyper-v.txt</span><br><span class="line"></span><br><span class="line">Dism /online /enable-feature /featurename:Microsoft-Hyper-V-All /LimitAccess /ALL</span><br></pre></td></tr></table></figure>
+
+<p>以管理员模式运行等待处理完成后，遵循提示重启电脑。现在windows管理工具中出现了Hyper-v管理器项目</p>
+<hr>
+<p>通过powershell开启Hyper-v功能：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All</span><br></pre></td></tr></table></figure>
+
+<p>开启wsl功能</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart</span><br></pre></td></tr></table></figure>
+
+<p>通过系统设置开启Hyper-v功能，与命令行等效：</p>
+<ol>
+<li>右键单击 Windows 按钮并选择“应用和功能”。</li>
+<li>选择相关设置下右侧的“程序和功能”。</li>
+<li>选择“打开或关闭 Windows 功能”。</li>
+<li>选择“Hyper-V”，然后单击“确定”。</li>
+</ol>
+<p>通过系统设置开启wsl功能，与命令行等效：</p>
+<ol>
+<li>打开控制面板。</li>
+<li>点击 “程序”。</li>
+<li>在 “程序和功能” 下，点击 “启用或关闭 Windows 功能”。</li>
+<li>在弹出的窗口中，找到 “适用于 Linux 的 Windows 子系统”，勾选该选项。</li>
+</ol>
+<h2 id="卸载wsl子系统"><a href="#卸载wsl子系统" class="headerlink" title="卸载wsl子系统"></a>卸载wsl子系统</h2><p>查看当前环境安装的wsl</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --list</span><br></pre></td></tr></table></figure>
+
+<p>注销（卸载）当前安装的Linux的Windows子系统</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --unregister Ubuntu</span><br></pre></td></tr></table></figure>
+
+<p>卸载成功，查看当前安装的Linux的Windows子系统</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --list</span><br></pre></td></tr></table></figure>
+
+<p>查看可安装的Linux的Windows子系统</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --list --online</span><br></pre></td></tr></table></figure>
+
+<p>从 WSL 取消注册发行版，以便可以重新安装或清理它。注意： 一旦取消注册，与该发行版相关的所有数据、设置和软件都将永久丢失。从商店重新安装将安装分发的干净副本。</p>
+<h2 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h2><p>傻瓜式安装</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --install</span><br></pre></td></tr></table></figure>
+
+<p>设置用户名和密码</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">enter UNIX username:jack</span><br><span class="line">enter password for jack:1234</span><br></pre></td></tr></table></figure>
+
+<p>设置root密码</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">sudo passwd</span><br><span class="line">[sudo] password for jack:</span><br><span class="line">New password:1234</span><br><span class="line">Retype new password:1234</span><br></pre></td></tr></table></figure>
+
+<h2 id="原理介绍"><a href="#原理介绍" class="headerlink" title="原理介绍"></a>原理介绍</h2><p>首先，type1与type2虚拟机架构区别如下图所示，其中关键区别在于Hypervisor处在的层级不同：</p>
+<p><img src="/images/image-20230726181937164.png" alt="image-20230726181937164"></p>
+<p>Hyper-v是type1虚拟机，可以看到，type1虚拟机是一种更彻底的虚拟化，所有的操作系统都作为guest os，其虚拟化是真正的硬件层面；而type2虚拟机是一种更浅层的虚拟化，其Hypervisor是作为host os的软件运行的，是操作系统层面的虚拟化</p>
+<p>关于性能方面：两者的优劣是显而易见的，对于想要使用的虚拟机，type1能通过Hypervisor直接和硬件交互，而type2需要通过Hypervisor经由host os才能和硬件交互，因此对于想要使用的虚拟机，type1拥有更好的性能。而对于计算机原本的系统，type1将原本的host os变为了guest os，因此性能受到一定影响，而type2中host os状态不变，不会受到性能影响</p>
+<h2 id="计算机虚拟化补充"><a href="#计算机虚拟化补充" class="headerlink" title="计算机虚拟化补充"></a>计算机虚拟化补充</h2><p><strong>计算虚拟化</strong>通过虚拟化管理程序（Hypervisor或VMM）将物理服务器的硬件资源与上层应用进行解耦，形成统一的计算资源池，然后可弹性分配给逻辑上隔离的虚拟机共享使用。基于VMM所在位置与虚拟化范围可以分为多种类型：</p>
+<ul>
+<li>全虚拟化</li>
+</ul>
+<p>全虚拟化使用一个虚拟机作为虚拟机管理器(Hypervisor)，统一调度客户操作系统与原始硬件，Hypervisor会捕捉和处理与虚拟化相关的特权指令，使客户操作系统无须修改就能运行，但性能也会低于物理机，代表性的产品包括ESX、KVM、Oracle Virtual Box。<strong>全虚拟化的特点是不需要改动任何guest os的源码，guest os理论上不知道自己是虚拟机</strong></p>
+<ul>
+<li>半虚拟化</li>
+</ul>
+<p>半虚拟化技术与全虚拟化有相似之处，也是利用Hypervisor来实现对底层硬件的共享访问，区别在于半虚拟化技术将与虚拟化相关的代码集成到客户操作系统中，使客户端操作系统与Hypervisor更好地配合，因此Hypervisor不需要重新编译或捕获特权指令，其性能可以非常接近物理机，缺点在于其支持的客户操作系统受限，用户体验较差，经典的产品有Xen和Hyper-V。<strong>需要对guest os源码进行修改，guest os知道自己是虚拟机，因此能更好地处理难以虚拟化的指令</strong></p>
+<ul>
+<li>硬件辅助虚拟化（跟上面两个不是并列关系）</li>
+</ul>
+<p>硬件辅助虚拟化是通过对部分全虚拟化和半虚拟化使用到的软件技术进行硬件化处理来提高性能，是对全虚拟化和半虚拟化的一种优化，如今许多虚拟机产品都逐渐支持这样的特性。</p>
+<hr>
+<p><strong>容器（应用级虚拟化）</strong>：容器是一种更加轻量的应用级虚拟化技术，将应用的可执行文件及其所需的运行时环境与依赖库打包，实现一次构建，到处运行的目标。相比虚拟化，容器技术多了容器引擎层（如Docker），但上层应用无需与Guest OS绑定，可以实现秒级部署、跨平台迁移，灵活的资源分配，弹性调度管理等优势。容器、微服务与DevOps为云原生的三大要素，是推动企业技术中台建设与微服务化转型不可或缺的组件。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://thethepai.github.io/2024/04/14/HyperV-WSL/" data-id="cluzl9uv300001wviefisahia" data-title="HyperV/WSL" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-VPD-test" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/04/14/VPD-test/" class="article-date">
   <time class="dt-published" datetime="2024-04-14T13:20:01.000Z" itemprop="datePublished">2024-04-14</time>
 </a>
     
@@ -83,7 +188,7 @@
         
   
     <h1 itemprop="name">
-      <a class="p-name article-title" href="/2024/04/14/new-post/">VPD test</a>
+      <a class="p-name article-title" href="/2024/04/14/VPD-test/">VPD test</a>
     </h1>
   
 
@@ -142,7 +247,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://thethepai.github.io/2024/04/14/new-post/" data-id="cluzkiaa30001f0vi7vy3dcny" data-title="VPD test" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://thethepai.github.io/2024/04/14/VPD-test/" data-id="cluzl9uv700011wvi4z7s6lbs" data-title="VPD test" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
@@ -236,7 +341,11 @@
       <ul>
         
           <li>
-            <a href="/2024/04/14/new-post/">VPD test</a>
+            <a href="/2024/04/14/HyperV-WSL/">HyperV/WSL</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/14/VPD-test/">VPD test</a>
           </li>
         
           <li>
