@@ -13,10 +13,16 @@
 <meta property="og:site_name" content="PaiBLOG">
 <meta property="og:description" content="区块链实验过程简单记录 实验过程一共两个实验，主要使用ubuntu23.04进行 fabric 1.4前置环境 Go，参考官网使用官方脚本安装：https:&#x2F;&#x2F;go.dev&#x2F;doc&#x2F;install Docker，根据官方脚本指引安装：https:&#x2F;&#x2F;get.docker.com&#x2F;  注意go需要自己将bin添加到环境变量： 12source &#x2F;etc&#x2F;profilesudo reboot  任务">
 <meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231130112232554.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231130112333766.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231203085401363.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231203085425591.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231203085103161.png">
 <meta property="article:published_time" content="2024-04-14T15:12:36.000Z">
-<meta property="article:modified_time" content="2024-04-14T15:13:19.415Z">
+<meta property="article:modified_time" content="2024-04-15T04:31:42.374Z">
 <meta property="article:author" content="jackpai">
 <meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://thethepai.github.io/images/image-20231130112232554.png">
   
     <link rel="alternate" href="/atom.xml" title="PaiBLOG" type="application/atom+xml">
   
@@ -115,11 +121,11 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">./byfn.sh generate</span><br><span class="line">./byfn.sh up</span><br></pre></td></tr></table></figure>
 
 <p>注意，在执行的时候可能会报命令或文件找不到，这是因为新版docker中命令已经由<code>docker-compose</code>改成了<code>docker compose</code>，他报哪行不对就把那一行改过来然后重新执行，实测<code>./byfn.sh up</code>和一会儿用到的<code>./byfn.sh down</code>会分别报一次</p>
-<p>![image-20231130112232554](..&#x2F;~picture bed&#x2F;blockchain_myself.assets&#x2F;image-20231130112232554.png)</p>
+<p><img src="/images/image-20231130112232554.png" alt="image-20231130112232554"></p>
 <p>结束：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./byfn.sh down</span><br></pre></td></tr></table></figure>
 
-<p>![image-20231130112333766](..&#x2F;~picture bed&#x2F;blockchain_myself.assets&#x2F;image-20231130112333766.png)</p>
+<p><img src="/images/image-20231130112333766.png" alt="image-20231130112333766"></p>
 <h4 id="排故"><a href="#排故" class="headerlink" title="排故"></a>排故</h4><p>第二次generate时可能报错：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&gt;Error response from daemon: Conflict. The container name <span class="string">&quot;/cli&quot;</span> is already <span class="keyword">in</span> use by container <span class="string">&quot;f56d257a543fb157cf482758fb7ecbebfb1e04187643222bb71564e9cabb541c&quot;</span>. You have to remove (or rename) that container to be able to reuse that name.</span><br></pre></td></tr></table></figure>
 
@@ -135,8 +141,8 @@
 <p>实验测试，查询投票结果：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 查询所有</span></span><br><span class="line">peer chaincode invoke -n mycc -c <span class="string">&#x27;&#123;&quot;Args&quot;:[&quot;get&quot;]&#125;&#x27;</span> -C myc</span><br><span class="line"><span class="comment"># 查询单个</span></span><br><span class="line">peer chaincode invoke -n mycc -c <span class="string">&#x27;&#123;&quot;Args&quot;:[&quot;get&quot;, &quot;Mike&quot;]&#125;&#x27;</span> -C myc</span><br></pre></td></tr></table></figure>
 
-<p>![image-20231203085401363](..&#x2F;~picture bed&#x2F;blockchain_myself.assets&#x2F;image-20231203085401363.png)</p>
-<p>![image-20231203085425591](..&#x2F;~picture bed&#x2F;blockchain_myself.assets&#x2F;image-20231203085425591.png)</p>
+<p><img src="/images/image-20231203085401363.png" alt="image-20231203085401363"></p>
+<p><img src="/images/image-20231203085425591.png" alt="image-20231203085425591"></p>
 <h4 id="排故-1"><a href="#排故-1" class="headerlink" title="排故"></a>排故</h4><p>这里出现一个问题，当运行<code>docker exec</code>时可能会进不去，提示形如下文：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 我的cli这一个container进不去</span></span><br><span class="line">container xxxx is not running</span><br></pre></td></tr></table></figure>
 
@@ -161,7 +167,7 @@
 <p>这里我把<code>-addr</code>参数漏掉了，导致自动分配了30301，好像不影响，所以下面我就直接贴这个enode了，正常的话最后应该是30305</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建两个新终端分别运行node，注意unlock参数要改成node的address</span></span><br><span class="line"><span class="comment"># bootnodes 后面的一串要改成你上面运行那个命令输出的内容</span></span><br><span class="line"><span class="comment"># node1最后的miner.etherbase也要改成node1的address，node2不用这个参数</span></span><br><span class="line">geth --datadir node1 --port 30306 --bootnodes enode://5d170c8052b0cfa35154626b03bd4d1bac54bc4998620893b49962452c664826790ee8ea529ca082bb88088396c88cd8714db15b259ab62de4da0d1b496a73db@127.0.0.1:0?discport=30301  --networkid 123454321 --unlock 0x41090BEc560C3a9fc33d929c45F6D051AA064415 --password password.txt --authrpc.port 8551 --http --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain <span class="string">&quot;*&quot;</span> --allow-insecure-unlock --mine --miner.etherbase=0x41090BEc560C3a9fc33d929c45F6D051AA064415</span><br><span class="line">geth --datadir node2 --port 30307 --bootnodes enode://5d170c8052b0cfa35154626b03bd4d1bac54bc4998620893b49962452c664826790ee8ea529ca082bb88088396c88cd8714db15b259ab62de4da0d1b496a73db@127.0.0.1:0?discport=30301  --networkid 123454321 --unlock 0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7 --password password.txt --authrpc.port 8552 --http --http.addr 0.0.0.0 --http.port 8546 --http.corsdomain <span class="string">&quot;*&quot;</span> --allow-insecure-unlock</span><br><span class="line"><span class="comment"># 开另一个终端连接到node1</span></span><br><span class="line">geth attach node1/geth.ipc</span><br><span class="line"><span class="comment"># 查看余额</span></span><br><span class="line">eth.getBalance(eth.accounts[0])</span><br><span class="line"><span class="comment"># 在node1的账号发1给node2，注意改地址</span></span><br><span class="line">eth.sendTransaction(&#123;</span><br><span class="line">  to: <span class="string">&#x27;0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7&#x27;</span>,</span><br><span class="line">  from: eth.accounts[0],</span><br><span class="line">  value: 25000</span><br><span class="line">&#125;);</span><br><span class="line"><span class="comment"># 查看自己的余额和node2的余额，注意改地址</span></span><br><span class="line">eth.getBalance(eth.accounts[0])</span><br><span class="line">eth.getBalance(<span class="string">&#x27;0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7&#x27;</span>)</span><br><span class="line"><span class="comment"># 如果node1减少了不止1，node2加了1，那么恭喜你顺利完成！</span></span><br></pre></td></tr></table></figure>
 
-<p>![image-20231203085103161](..&#x2F;~picture bed&#x2F;blockchain_myself.assets&#x2F;image-20231203085103161.png)</p>
+<p><img src="/images/image-20231203085103161.png" alt="image-20231203085103161"></p>
 <p>连接到 Remix：<a target="_blank" rel="noopener" href="http://remix.ethereum.org/#lang=zh&optimize=false&runs=200&evmVersion=null&version=soljson-v0.4.26+commit.4563c3fc.js&language=Solidity">http://remix.ethereum.org/#lang=zh&amp;optimize=false&amp;runs=200&amp;evmVersion=null&amp;version=soljson-v0.4.26+commit.4563c3fc.js&amp;language=Solidity</a></p>
 <p>这一步可以在主机进行，环境选择Custom - External Http Provider，Address 分别是  <a target="_blank" rel="noopener" href="http://ip:8545/">http://ip:8545</a> 和 <a target="_blank" rel="noopener" href="http://ip:8546/">http://ip:8546</a>，虚拟机ip使用<code>ifconfig</code>查看</p>
 <h4 id="任务-2：复现重入漏洞"><a href="#任务-2：复现重入漏洞" class="headerlink" title="任务 2：复现重入漏洞"></a>任务 2：<strong>复现重入漏洞</strong></h4><p>Remix:<a target="_blank" rel="noopener" href="http://remix.ethereum.org/#lang=zh&optimize=false&runs=200&evmVersion=null&version=soljson-v0.4.26+commit.4563c3fc.js&language=Solidity">http://remix.ethereum.org/#lang=zh&amp;optimize=false&amp;runs=200&amp;evmVersion=null&amp;version=soljson-v0.4.26+commit.4563c3fc.js&amp;language=Solidity</a></p>

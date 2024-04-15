@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>net security | PaiBLOG</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="网络入侵防御使用snort提示对应网络入侵 实验11环境为docker desktop for windows，安装好docker-snort，请使用管理员权限： 1docker run -it --rm --net&#x3D;host linton&#x2F;docker-snort &#x2F;bin&#x2F;bash  启动，规则文件位于&#x2F;etc&#x2F;snort&#x2F;rules&#x2F;local.rules，配置文件位于&#x2F;etc&#x2F;snort&#x2F;">
+<meta property="og:type" content="website">
+<meta property="og:title" content="net security">
+<meta property="og:url" content="http://thethepai.github.io/Sec/Net-Sec.html">
+<meta property="og:site_name" content="PaiBLOG">
+<meta property="og:description" content="网络入侵防御使用snort提示对应网络入侵 实验11环境为docker desktop for windows，安装好docker-snort，请使用管理员权限： 1docker run -it --rm --net&#x3D;host linton&#x2F;docker-snort &#x2F;bin&#x2F;bash  启动，规则文件位于&#x2F;etc&#x2F;snort&#x2F;rules&#x2F;local.rules，配置文件位于&#x2F;etc&#x2F;snort&#x2F;">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104191835897.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104200220391.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104215541897.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104212909461.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104213014573.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104213059241.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104213121432.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104223317929.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104223601542.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104223648984.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240104223712063.png">
+<meta property="article:published_time" content="2024-04-15T04:14:09.000Z">
+<meta property="article:modified_time" content="2024-04-15T04:19:09.105Z">
+<meta property="article:author" content="jackpai">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://thethepai.github.io/images/image-20240104191835897.png">
+  
+    <link rel="alternate" href="/atom.xml" title="PaiBLOG" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<meta name="generator" content="Hexo 7.1.1"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">PaiBLOG</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        
+          <a class="nav-icon" href="/atom.xml" title="RSS Feed"><span class="fa fa-rss"></span></a>
+        
+        <a class="nav-icon nav-search-btn" title="Search"><span class="fa fa-search"></span></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://thethepai.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main"><article id="page-" class="h-entry article article-type-page" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/Sec/Net-Sec.html" class="article-date">
+  <time class="dt-published" datetime="2024-04-15T04:14:09.000Z" itemprop="datePublished">2024-04-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="p-name article-title" itemprop="headline name">
+      net security
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="网络入侵防御"><a href="#网络入侵防御" class="headerlink" title="网络入侵防御"></a>网络入侵防御</h1><p>使用snort提示对应网络入侵</p>
+<h2 id="实验1"><a href="#实验1" class="headerlink" title="实验1"></a>实验1</h2><h3 id="1"><a href="#1" class="headerlink" title="1"></a>1</h3><p>环境为docker desktop for windows，安装好docker-snort，请使用管理员权限：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run -it --<span class="built_in">rm</span> --net=host linton/docker-snort /bin/bash</span><br></pre></td></tr></table></figure>
+
+<p>启动，规则文件位于<code>/etc/snort/rules/local.rules</code>，配置文件位于<code>/etc/snort/etc/snort.conf</code>。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -i eth0 -c /etc/snort/etc/snort.conf -A console</span><br></pre></td></tr></table></figure>
+
+<p>添加规则（其实已经添加好了），在docker desktop中开另一个终端ping一下，测试自定义的规则能不能检测到ping操作：</p>
+<p><img src="/images/image-20240104191835897.png" alt="image-20240104191835897"></p>
+<h3 id="2"><a href="#2" class="headerlink" title="2"></a>2</h3><p>容器中安装nmap：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo apt-get update</span><br><span class="line">sudo apt-get install nmap</span><br></pre></td></tr></table></figure>
+
+<p>添加规则：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alert icmp any any -&gt; 8.8.8.8 any (msg:<span class="string">&quot;NMAP Ping Sweep Scan&quot;</span>;dsize:0;sid:1000004;)</span><br></pre></td></tr></table></figure>
+
+<p>启动：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -i eth0 -c /etc/snort/etc/snort.conf -A console</span><br></pre></td></tr></table></figure>
+
+<p>在docker desktop中再开一个终端，运行nmap扫描命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nmap -sP 8.8.8.8 -disable-arp-ping</span><br></pre></td></tr></table></figure>
+
+<p>观察一下能否检测到这个扫描操作：</p>
+<p><img src="/images/image-20240104200220391.png" alt="image-20240104200220391"></p>
+<h2 id="实验2"><a href="#实验2" class="headerlink" title="实验2"></a>实验2</h2><h3 id="1-1"><a href="#1-1" class="headerlink" title="1"></a>1</h3><p>用wireshark打开<code>log4j-attempts.pcap</code>，观察一下log4j攻击的特征：</p>
+<p><img src="/images/image-20240104215541897.png" alt="image-20240104215541897"></p>
+<p>使用log4j相关的pcap文件，将<code>log4j-attempts.pcap</code>放在pcap目录下，然后用<code>docker cp</code>命令复制到容器里面去：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">docker ps</span><br><span class="line">docker <span class="built_in">cp</span> [<span class="built_in">dir</span>] [docker <span class="built_in">id</span>]:/home/</span><br></pre></td></tr></table></figure>
+
+<p>具体情形如下：</p>
+<p><img src="/images/image-20240104212909461.png" alt="image-20240104212909461"></p>
+<p>在<code>local.rules</code>中添加检测log4j攻击的规则：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alert tcp any any -&gt; any 80 (content:<span class="string">&quot;jndi:ldap://&quot;</span>;content:<span class="string">&quot;GET&quot;</span>;http_method;sid:1000000;)</span><br></pre></td></tr></table></figure>
+
+<p>运行snort，检测log4j攻击：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -r /home/pcap/log4j-attempts.pcap -c snort.conf -A console</span><br></pre></td></tr></table></figure>
+
+<p>启动：</p>
+<p><img src="/images/image-20240104213014573.png" alt="image-20240104213014573"></p>
+<p>捕获攻击网络包如下：</p>
+<p><img src="/images/image-20240104213059241.png" alt="image-20240104213059241"></p>
+<p>结果产生安全警告如下：</p>
+<p><img src="/images/image-20240104213121432.png" alt="image-20240104213121432"></p>
+<h3 id="2-1"><a href="#2-1" class="headerlink" title="2"></a>2</h3><p>用wireshark打开<code>mirai.pcap</code>，观察一下mirai攻击的特征：</p>
+<p>![image-20240104222223894](..&#x2F;~picture bed&#x2F;netsecurity.assets&#x2F;image-20240104222223894.png)</p>
+<p>使用mirai相关的pcap文件，将<code>mirai.pcap</code>放在pcap2目录下，然后用<code>docker cp</code>命令复制到容器里面去：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">docker ps</span><br><span class="line">docker <span class="built_in">cp</span> [<span class="built_in">dir</span>] [docker <span class="built_in">id</span>]:/home/</span><br></pre></td></tr></table></figure>
+
+<p>具体情形如下：</p>
+<p><img src="/images/image-20240104223317929.png" alt="image-20240104223317929"></p>
+<p>在<code>local.rules</code>中添加检测mirai攻击的规则：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">alert tcp any any -&gt; any 23 (content:<span class="string">&quot;12345&quot;</span>;content:<span class="string">&quot;123456&quot;</span>;sid:1000000;)</span><br><span class="line"><span class="comment"># 23端口改成any也可以，这样扫的范围更广</span></span><br></pre></td></tr></table></figure>
+
+<p>运行snort，检测log4j攻击：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -r /home/pcap2/mirai.pcap -c snort.conf -A console</span><br></pre></td></tr></table></figure>
+
+<p>启动：</p>
+<p><img src="/images/image-20240104223601542.png" alt="image-20240104223601542"></p>
+<p>捕获攻击网络包如下：</p>
+<p><img src="/images/image-20240104223648984.png" alt="image-20240104223648984"></p>
+<p>结果产生安全警告如下：</p>
+<p><img src="/images/image-20240104223712063.png" alt="image-20240104223712063"></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://thethepai.github.io/Sec/Net-Sec.html" data-id="clv0g3yc700007svi1bme2xol" data-title="net security" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+    </footer>
+  </div>
+  
+    
+  
+</article>
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+
+  
+    
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">April 2024</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2024/04/14/Block-Chain/">Block Chain</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/14/HyperV-WSL/">HyperV/WSL</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/14/VPD-test/">VPD test</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/14/hello-world/">Hello World</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2024 jackpai<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.6.4.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>
