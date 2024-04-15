@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>P/NP | PaiBLOG</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="P&amp;NP问题导论，NP完全性">
+<meta property="og:type" content="article">
+<meta property="og:title" content="P&#x2F;NP">
+<meta property="og:url" content="http://thethepai.github.io/2024/04/15/P-NP/index.html">
+<meta property="og:site_name" content="PaiBLOG">
+<meta property="og:description" content="P&amp;NP问题导论，NP完全性">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231223215506780.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231223224025252.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231223224038370.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231223224056065.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231223223545077.png">
+<meta property="article:published_time" content="2024-04-15T11:09:06.000Z">
+<meta property="article:modified_time" content="2024-04-15T11:15:09.148Z">
+<meta property="article:author" content="jackpai">
+<meta property="article:tag" content="Algorithm">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://thethepai.github.io/images/image-20231223215506780.png">
+  
+    <link rel="alternate" href="/atom.xml" title="PaiBLOG" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<meta name="generator" content="Hexo 7.1.1"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">PaiBLOG</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        
+          <a class="nav-icon" href="/atom.xml" title="RSS Feed"><span class="fa fa-rss"></span></a>
+        
+        <a class="nav-icon nav-search-btn" title="Search"><span class="fa fa-search"></span></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://thethepai.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main"><article id="post-P-NP" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/04/15/P-NP/" class="article-date">
+  <time class="dt-published" datetime="2024-04-15T11:09:06.000Z" itemprop="datePublished">2024-04-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="p-name article-title" itemprop="headline name">
+      P/NP
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>P&amp;NP问题导论，NP完全性</p>
+<span id="more"></span>
+
+<h2 id="不可计算性"><a href="#不可计算性" class="headerlink" title="不可计算性"></a>不可计算性</h2><p>算法导论定义速览：</p>
+<ul>
+<li>P类问题就是在多项式时间内可以解决的问题</li>
+<li>NP类问题就是在多项式时间内可以被证明的问题</li>
+<li>NPC，即NP完全类问题是说，如果一个NP问题和其他任何NP问题一样“不易解决”，那么它是NP完全类问题，NPC问题</li>
+</ul>
+<h2 id="多项式时间规约"><a href="#多项式时间规约" class="headerlink" title="多项式时间规约"></a>多项式时间规约</h2><p>假设我们可以在多项式时间内求解Y问题，我们还能在多项式时间内求解哪些问题？</p>
+<p>规约Reduction：如果对任意 X 问题的输入实例可通过以下方式求解：</p>
+<ul>
+<li>使用多项式个数的简单计算步骤</li>
+<li>使用多项式个数的对求解 Y 问题的函数调用</li>
+</ul>
+<p>则称X问题可在多项式时间规约到Y问题，记为$X\le_pY$，显然，当我们能够多项式时间求解Y问题时，我们也能够多项式时间求解X问题，反之亦然。牢记多项式时间规约的定义，其实它描述的是X和Y在计算难度上属于同一类问题。</p>
+<p><img src="/images/image-20231223215506780.png" alt="image-20231223215506780"></p>
+<h3 id="packing和covering问题"><a href="#packing和covering问题" class="headerlink" title="packing和covering问题"></a>packing和covering问题</h3><p>independent set独立集问题：给定图G &#x3D; (V, E)和整数k，是否存在一个大小至少为k的顶点子集满足任意两个顶点不相邻（无边连接）？</p>
+<p>vertex cover顶点覆盖问题：给定图G &#x3D; (V, E)和整数k，是否存在一个大小至多为k的顶点子集满足任意所有边都和集合中至少一点相邻？</p>
+<p>这两个问题就是互相可规约的，可以记为$独立集\equiv_p顶点覆盖$。事实上，当总共有n个顶点时，大小为k的独立集合S为独立集当且仅当V-S是大小为n-k的顶点覆盖集。</p>
+<hr>
+<p>set cover集合覆盖问题：给定全集U，一个U的若干子集构成的集合S，和一个整数k，问是否存在至多k个子集的并等于全集U？</p>
+<p>顶点覆盖可以归约到集合覆盖：$顶点覆盖\le_p集合覆盖$</p>
+<p>证明思路：给定一个顶点覆盖实例G &#x3D; (V, E)和整数k，构造一个集合覆盖实例(U, S, k)使得，存在大小为k的集合覆盖当且仅当存在一个大小为k顶点覆盖</p>
+<hr>
+<p>简要过程：</p>
+<p><img src="/images/image-20231223224025252.png" alt="image-20231223224025252"></p>
+<p><img src="/images/image-20231223224038370.png" alt="image-20231223224038370"></p>
+<p><img src="/images/image-20231223224056065.png" alt="image-20231223224056065"></p>
+<h3 id="约束可满足性问题"><a href="#约束可满足性问题" class="headerlink" title="约束可满足性问题"></a>约束可满足性问题</h3><p>CNF和3-CNF问题</p>
+<p>合取范式定义如下：</p>
+<p><img src="/images/image-20231223223545077.png" alt="image-20231223223545077"></p>
+<p>当合取范式的每一个Clause中恰有三个Literal时，称之为3-CNF，要判断3-CNF是否是可满足的，这是一个困难的问题</p>
+<p>另：$3-CNF\le_p独立集$</p>
+<h3 id="决策，搜索，优化问题"><a href="#决策，搜索，优化问题" class="headerlink" title="决策，搜索，优化问题"></a>决策，搜索，优化问题</h3><p>这三种类型的问题可以互相规约，示例：</p>
+<ul>
+<li>决策问题：是否存在大小至多是k的顶点覆盖？</li>
+<li>搜索问题：找到一个大小是k的顶点覆盖。</li>
+<li>优化问题：找到最小的顶点覆盖。</li>
+</ul>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://thethepai.github.io/2024/04/15/P-NP/" data-id="clv0uz8u30001ngvicm6oftor" data-title="P/NP" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Algorithm/" rel="tag">Algorithm</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2024/04/15/String-Match/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          String Match
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2024/04/15/Reverse/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">Reverse</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Algorithm/" rel="tag">Algorithm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/" rel="tag">Security</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/VPD/" rel="tag">VPD</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Algorithm/" style="font-size: 20px;">Algorithm</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/VPD/" style="font-size: 10px;">VPD</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">April 2024</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2024/04/15/Segment-Tree/">Segment Tree</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/String-Match/">String Match</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/P-NP/">P/NP</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/Reverse/">Reverse</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/Software-Security/">Software-Security</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2024 jackpai<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.6.4.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>

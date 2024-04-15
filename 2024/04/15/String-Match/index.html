@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>String Match | PaiBLOG</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="字符串匹配">
+<meta property="og:type" content="article">
+<meta property="og:title" content="String Match">
+<meta property="og:url" content="http://thethepai.github.io/2024/04/15/String-Match/index.html">
+<meta property="og:site_name" content="PaiBLOG">
+<meta property="og:description" content="字符串匹配">
+<meta property="og:locale" content="en_US">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20231223181456983.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240115173434713.png">
+<meta property="og:image" content="http://thethepai.github.io/images/image-20240115194102567.png">
+<meta property="article:published_time" content="2024-04-15T11:11:02.000Z">
+<meta property="article:modified_time" content="2024-04-15T11:15:22.360Z">
+<meta property="article:author" content="jackpai">
+<meta property="article:tag" content="Algorithm">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://thethepai.github.io/images/image-20231223181456983.png">
+  
+    <link rel="alternate" href="/atom.xml" title="PaiBLOG" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<meta name="generator" content="Hexo 7.1.1"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">PaiBLOG</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        
+          <a class="nav-icon" href="/atom.xml" title="RSS Feed"><span class="fa fa-rss"></span></a>
+        
+        <a class="nav-icon nav-search-btn" title="Search"><span class="fa fa-search"></span></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://thethepai.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main"><article id="post-String-Match" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/04/15/String-Match/" class="article-date">
+  <time class="dt-published" datetime="2024-04-15T11:11:02.000Z" itemprop="datePublished">2024-04-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="p-name article-title" itemprop="headline name">
+      String Match
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>字符串匹配</p>
+<span id="more"></span>
+
+<h1 id="KMP"><a href="#KMP" class="headerlink" title="KMP"></a>KMP</h1><p>pattern match问题，判断T是否是S的子串，其中T被称为pattern</p>
+<p>参考：<a target="_blank" rel="noopener" href="https://oi-wiki.org/string/kmp/">前缀函数与 KMP 算法 - OI Wiki (oi-wiki.org)</a></p>
+<h2 id="BF"><a href="#BF" class="headerlink" title="BF"></a>BF</h2><p>如果采用暴力算法会怎么样？</p>
+<p>算法的基本思想是从主串的第一个字符开始和模式串的第一个字符进行比较，若相等，则继续比较二者的后续字符；否则，模式串回退到第一个字符，重新和主串的第二个字符进行比较。如此往复，直到主串中所有字符比较完毕。</p>
+<p>设n为主串的长度，m为模式串的长度。默认n&gt;&#x3D;m，算法的时间复杂度O(mn)</p>
+<p>暴力算法明显无法使人满意，在比较过程中有大量的浪费</p>
+<h2 id="前缀函数与KMP算法"><a href="#前缀函数与KMP算法" class="headerlink" title="前缀函数与KMP算法"></a>前缀函数与KMP算法</h2><h3 id="前缀函数"><a href="#前缀函数" class="headerlink" title="前缀函数"></a>前缀函数</h3><p>给定一个长度为n的字符串s，其 <strong>前缀函数</strong> 被定义为一个长度为n的数组$\pi[i]$。 其中$\pi[i]$的定义是：</p>
+<ol>
+<li>如果子串$s[0..i]$有一对相等的真前缀$s[0…k-1]$与真后缀$s[i-(k-1)..i]$，那么$\pi[i]$就是这个相等的真前缀 (或者真后缀，因为它们相等) 的长度，也就是$\pi[i]&#x3D;k$；</li>
+<li>如果不止有一对相等的，那么$\pi[i]$就是其中最长的那一对的长度；</li>
+<li>如果没有相等的，那么$\pi[i]&#x3D;0$。</li>
+</ol>
+<p>特别地，规定$\pi[0]&#x3D;0$</p>
+<p>举例来说，对于字符串 <code>abcabcd</code>，$\pi[i]&#x3D;[0,0,0,1,2,3,0]$</p>
+<h4 id="生成前缀函数"><a href="#生成前缀函数" class="headerlink" title="生成前缀函数"></a>生成前缀函数</h4><p>BF：时间复杂度$O(n^3)$</p>
+<ul>
+<li>用j来寻找真前缀与真后缀相等的情况</li>
+<li>从当前子串长度i开始，逐步减小</li>
+</ul>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">prefix_function</span><span class="params">(string s)</span> </span>&#123;</span><br><span class="line">  <span class="type">int</span> n = (<span class="type">int</span>)s.<span class="built_in">length</span>();</span><br><span class="line">  <span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">pi</span><span class="params">(n)</span></span>;</span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">1</span>; i &lt; n; i++)</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> j = i; j &gt;= <span class="number">0</span>; j--)</span><br><span class="line">      <span class="keyword">if</span> (s.<span class="built_in">substr</span>(<span class="number">0</span>, j) == s.<span class="built_in">substr</span>(i - j + <span class="number">1</span>, j)) &#123;</span><br><span class="line">        pi[i] = j;</span><br><span class="line">        <span class="keyword">break</span>;</span><br><span class="line">      &#125;</span><br><span class="line">  <span class="keyword">return</span> pi;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h4 id="优化："><a href="#优化：" class="headerlink" title="优化："></a>优化：</h4><p>一个重要的观察是<strong>相邻子串前缀函数值至多增加</strong>1</p>
+<ul>
+<li>所以当我们移动到下一个字串$s[0..i]$时，不需要令j&#x3D;i</li>
+<li>j只有可能增加1，不变，或者减少</li>
+<li>这样优化后算法的时间复杂度是$O(n^2)$</li>
+</ul>
+<p>用数学语言描述，当$s[i+1]&#x3D;s[\pi[i]]$时$\pi[i+1]&#x3D;\pi[i]+1$。这个式子的意思是，当我们移动到下一个子串时，新增的字符和原本子串找到的真前缀后一个字符是相同的，这样原本子串的真前缀和真后缀向后加一个字符，仍然相等。</p>
+<p>可以看到，我们用上述关系能很方便地计算j，那么当$s[i+1]\not&#x3D;s[\pi[i]]$，也就是失去匹配时或许也有类似的方法？</p>
+<p>答案是可以找仅次于$\pi[i]$的第二长度的j，在这一长度的j有相同的真前缀和真后缀，然后再利用上述性质：当$s[i+1]&#x3D;s[\pi[i]]$时$\pi[i+1]&#x3D;\pi[i]+1$，如果$s[i+1]\not&#x3D;s[\pi[i]]$，则重复本规则寻找更小的j。</p>
+<p><img src="/images/image-20231223181456983.png" alt="image-20231223181456983"></p>
+<p>当找到了第二长度的j，他将满足如下关系：</p>
+<p>$s[0…j-1]&#x3D;s[i-j+1…i]&#x3D;s[\pi[i]-j…\pi[i]-1]$</p>
+<p>j等价于子串$s[0…\pi[i]-1]$的前缀函数值，即是$j&#x3D;\pi[\pi[i]-1]$，事实上$\pi[i]$的值正代表着相等的真前缀与真后缀的长度，那不就是j吗，因此得到j的状态转移方程：</p>
+<p>$j_n&#x3D;\pi[j_{n-1}-1]$（唯一真神）</p>
+<p>最终优化版本如下，不包含任何字符串比较：时间复杂度$O(n)$</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">prefix_function</span><span class="params">(string s)</span> </span>&#123;</span><br><span class="line">  <span class="type">int</span> n = (<span class="type">int</span>)s.<span class="built_in">length</span>();</span><br><span class="line">  <span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">pi</span><span class="params">(n)</span></span>;</span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">1</span>; i &lt; n; i++) &#123;</span><br><span class="line">    <span class="type">int</span> j = pi[i - <span class="number">1</span>];</span><br><span class="line">    <span class="keyword">while</span> (j &gt; <span class="number">0</span> &amp;&amp; s[i] != s[j]) j = pi[j - <span class="number">1</span>];</span><br><span class="line">    <span class="keyword">if</span> (s[i] == s[j]) j++;</span><br><span class="line">    pi[i] = j;</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> pi;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="KMP算法实现"><a href="#KMP算法实现" class="headerlink" title="KMP算法实现"></a>KMP算法实现</h3><p>给定文本t和模式串s，找到s在t中的所有出现；假设模式串长度为n，文本串长度为m。</p>
+<p>思想：</p>
+<ul>
+<li>构造字符串s+#+t，其中#是两字符串均不包含的分隔符</li>
+<li>对这个连接起来的新字符串，求前缀函数即可</li>
+<li>当$\pi[i]&#x3D;n$，这说明找到了t的一个出现，且出现的右端点为i</li>
+<li>该算法的时间复杂度$O(n+m)$</li>
+</ul>
+<p>代码示例：</p>
+<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">vector&lt;<span class="type">int</span>&gt; <span class="title">find_occurrences</span><span class="params">(string text, string pattern)</span> </span>&#123;</span><br><span class="line">  string cur = pattern + <span class="string">&#x27;#&#x27;</span> + text;</span><br><span class="line">  <span class="type">int</span> sz1 = text.<span class="built_in">size</span>(), sz2 = pattern.<span class="built_in">size</span>();</span><br><span class="line">  vector&lt;<span class="type">int</span>&gt; v;</span><br><span class="line">  vector&lt;<span class="type">int</span>&gt; lps = <span class="built_in">prefix_function</span>(cur);</span><br><span class="line">  <span class="keyword">for</span> (<span class="type">int</span> i = sz2 + <span class="number">1</span>; i &lt;= sz1 + sz2; i++) &#123;</span><br><span class="line">    <span class="keyword">if</span> (lps[i] == sz2) v.<span class="built_in">push_back</span>(i - <span class="number">2</span> * sz2);</span><br><span class="line">  &#125;</span><br><span class="line">  <span class="keyword">return</span> v;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>不论是生成前缀函数，还是前缀函数的应用即KMP算法，他们都抓住了字符串的特征，来避免多余的操作，同时它们都是在线算法，也就是你可以输入一个字符计算一下，再输入一个字符再计算一下，这对减轻空间开销十分有意义。</p>
+<h2 id="补充：算法分析课程版本理解"><a href="#补充：算法分析课程版本理解" class="headerlink" title="补充：算法分析课程版本理解"></a>补充：算法分析课程版本理解</h2><p>ppt课件上，求解前缀函数的过程也是用字符串比较的过程来理解的。</p>
+<p>ppt课件上，kmp算法使用前缀数组（称之为next数组）来进行指针移动的控制，模式串和文本串上各有一个指针，当遭遇不匹配的情况时，将模式串上的指针按照next数组的对应位置值进行调整（回退）$p&#x3D;next[p]$</p>
+<p>例如，当target[13]!&#x3D;pattern[7]，将7减去next[7]，重新将target和pattern对齐。</p>
+<h1 id="BM：Boyer-Moore算法"><a href="#BM：Boyer-Moore算法" class="headerlink" title="BM：Boyer-Moore算法"></a>BM：Boyer-Moore算法</h1><p>BM算法是对KMP算法的改进，通过引入坏字符表来进行更大跨度的跳转，进一步减小了时间浪费。</p>
+<h2 id="原理"><a href="#原理" class="headerlink" title="原理"></a>原理</h2><p>以后补充</p>
+<h2 id="匹配过程"><a href="#匹配过程" class="headerlink" title="匹配过程"></a>匹配过程</h2><ul>
+<li>从尾部开始比较！</li>
+<li>当出现失配时，我们称文本串中的这个失配字符为坏字符<ul>
+<li>文本串中出现了模式串中没有的那个坏字符，则将模式串整体移动到坏字符后方一个字符。</li>
+<li>文本串中出现了模式串中有的坏字符，则将模式串中最靠右的对应字符与坏字符相对。</li>
+</ul>
+</li>
+<li>好后缀：所有尾部匹配的字符串，都是好后缀<ul>
+<li>好后缀移动规则：将模式串中好后缀上一次出现的地方与文本串中的好后缀对齐</li>
+<li>好后缀移动规则要与坏字符移动规则相比较，取移动范围大者进行移动操作</li>
+</ul>
+</li>
+</ul>
+<p>实际例子：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">HERE IS A SIMPLE EXAMPLE</span><br><span class="line">EXAMPLE</span><br><span class="line"><span class="comment"># S是坏字符，模式串移动到S后面</span></span><br><span class="line">HERE IS A SIMPLE EXAMPLE</span><br><span class="line">       EXAMPLE</span><br><span class="line"><span class="comment"># P是坏字符，模式串里面有，把模式串最右边的那个P和坏字符对齐</span></span><br><span class="line">HERE IS A SIMPLE EXAMPLE</span><br><span class="line">         EXAMPLE</span><br><span class="line"><span class="comment"># 依次匹配ELPM都成功，I与A失配</span></span><br><span class="line"><span class="comment"># MPLE，PLE，LE，E都是好后缀</span></span><br><span class="line"><span class="comment"># E这个好后缀有上一次出现的地方，也就是模式串首字母E</span></span><br><span class="line"><span class="comment"># 把这个模式串中的E和文本串好后缀对齐</span></span><br><span class="line"><span class="comment"># 注：这个地方按照I与A失配坏字符规则移动的更少</span></span><br><span class="line">HERE IS A SIMPLE EXAMPLE</span><br><span class="line">               EXAMPLE</span><br><span class="line"><span class="comment"># P是坏字符，模式串里面有，把模式串最右边的那个P和坏字符对齐</span></span><br><span class="line">HERE IS A SIMPLE EXAMPLE</span><br><span class="line">                 EXAMPLE</span><br><span class="line"><span class="comment"># 我去，匹配成功！</span></span><br></pre></td></tr></table></figure>
+
+<h1 id="Aho-Corasick"><a href="#Aho-Corasick" class="headerlink" title="Aho-Corasick"></a>Aho-Corasick</h1><p>AC自动机，简单来说，这是KMP算法拓展到多模式后的结果。</p>
+<p>单字符串-&gt;字典树（trie）；Next数组-&gt;失配路径。</p>
+<h2 id="字典树与DFA"><a href="#字典树与DFA" class="headerlink" title="字典树与DFA"></a>字典树与DFA</h2><p>字典树原则：</p>
+<ul>
+<li>根节点不含有字符</li>
+<li>根节点到某一个终点连接起来为搜索字符串</li>
+<li>任意节点的所有子节点包含字符不相同</li>
+</ul>
+<p>使用字典树进行搜索符合有限自动机的概念。</p>
+<h3 id="原理-1"><a href="#原理-1" class="headerlink" title="原理"></a>原理</h3><p>具体匹配时，需要引入失配指针的概念，显然，如果一个字符失配了，我们不一定要重新开始匹配。失配指针的构建方法如下：关键在于，如果father的fail能够接纳自己，比如这里8号节点的father的fail也就是0号节点，可以接纳h，那么我们就将8号节点的fial指向接纳h后的1号节点。如果没有满足的条件，则继续回溯father‘s father的fail，一直都没有的话就指向根节点。</p>
+<p><img src="/images/image-20240115173434713.png" alt="image-20240115173434713"></p>
+<ol>
+<li>root指向自己</li>
+<li>father是root则指向root</li>
+<li>回溯判断father的fail<ol>
+<li>if father的fial节点能够接纳自己，then指向father的fial节点接纳自己后的节点</li>
+<li>else 继续回溯father’s father的fial节点</li>
+<li>如果回溯到根节点还没有找到，那就把fial节点指向根节点</li>
+</ol>
+</li>
+</ol>
+<p>构建完毕后匹配的过程就很简单了，直接由根节点一路往下查询即可，如果失配，依照fail指针进行回溯。</p>
+<h1 id="Wu-Manber"><a href="#Wu-Manber" class="headerlink" title="Wu-Manber"></a>Wu-Manber</h1><p>WM算法是一种多模式匹配算法，它是上文所述AC算法的优化。</p>
+<h2 id="原理-2"><a href="#原理-2" class="headerlink" title="原理"></a>原理</h2><p>VM算法的构成如下：SHIFT，HASH，PREFIX。</p>
+<p>一般从模式串集合中，所有模式的前m个字符构建SHIFT表，其中m是模式串集合中最短模式的长度值。我们可以把这前m个字符称作前缀。</p>
+<p>构建SHIFT表的过程是：</p>
+<ul>
+<li>在前缀中取一个一个字符快B，字符快B的长度一般为2或者3，计算它与前缀末尾的距离n。</li>
+<li>以模式abcdefgh为例，假设m&#x3D;6，那么SHIFT[ab]&#x3D;4，SHIFT[bc]&#x3D;3，SHIFT[cd]&#x3D;2，SHIFT[de]&#x3D;1，SHIFT[ef]&#x3D;0都要加入SHIFT表中。</li>
+<li>如果一个模式或者多个模式中有相同的字符快，选取SHIFT值小者加入SHIFT表。</li>
+</ul>
+<p>构建完SHIFT表后我们构建HASH表，即将所有SHIFT[B]&#x3D;0的表项映射到对应的模式串，比如对于m&#x3D;5时模式串abcde，bcbde，对于块de，他们的SHIFT值都是0，所以他们都由de索引。</p>
+<p>其实构建完以上两个表已经可以进行匹配了，但是为了应对一个SHIFT表项可能索引非常多个模式串的情况，比如，有10个以de结尾的模式串就会十分不方便，因此建立PREFIX表，存储模式串的第一个字符块（或者说存储一定长度的PREFIX前缀）。</p>
+<p><img src="/images/image-20240115194102567.png" alt="image-20240115194102567"></p>
+<h2 id="匹配过程-1"><a href="#匹配过程-1" class="headerlink" title="匹配过程"></a>匹配过程</h2><p>对于目标串target，游标i，模式前缀长度m，字符快长度B，PREFIX前缀长度C（在这个例子中就是取出的第一个字符快）</p>
+<ul>
+<li><p>对于target[1…n]，初始游标置于i&#x3D;m处</p>
+</li>
+<li><p>我们取target[i-B+1…i]（以i结尾的字符快），查找其在SHIFT表中的对应值SHIFT[target[i-B+1…i]]</p>
+<ul>
+<li><p>如果找不到，则i+&#x3D;m-B+1。在B&#x3D;2的情况下就是m-1</p>
+</li>
+<li><p>如果其值为c(c !&#x3D; 0)，那么我们i+&#x3D;c，再执行上述操作</p>
+</li>
+</ul>
+</li>
+<li><p>如果其SHIFT值等于0，我们需要取出target[i-m+1…i-m+C]（前缀m中的第一个字符快），然后在SHIFT[de]&#x3D;0对应PREFIX结合中查找PREFIX[target[i-m+1…i-m+C]]</p>
+<ul>
+<li>如果不存在，则将游标i+&#x3D;1</li>
+<li>如果存在则用target[i-m+1]开始的子串，依次匹配满足条件的所有模式串，直到找到匹配模式，或者未发现匹配位置。然后i+&#x3D;1，继续向后查找</li>
+</ul>
+</li>
+</ul>
+<p>下面以WM算法对目标串target[1…10]&#x3D;dcbacabcde，模式集合P{abcde,bcbde,abcabe}，的匹配过程来形象的说明一下。首先，对于模式集合P预处理之后的结果如上面的程序结构图所示。然后从i&#x3D;5开始执行算法。首先我们发现target[4…5] &#x3D; ac，SHIFT表中不存在ac，所以i+4，到target[9]，此时发现target[8…9]&#x3D;cd，SHIFT[cd]&#x3D;1，所以i+1，然后发现target[9…10]&#x3D;0，我们取target[6…7]&#x3D;ab，发现PREFIX[ab]对应的模式串是abcde，然后我们从target[6]开始用目标串与模式串比较，发现匹配模式abcde。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://thethepai.github.io/2024/04/15/String-Match/" data-id="clv0uz8u60003ngvi4cpo1nmr" data-title="String Match" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Algorithm/" rel="tag">Algorithm</a></li></ul>
+
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+    <a href="/2024/04/15/Segment-Tree/" id="article-nav-newer" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Newer</strong>
+      <div class="article-nav-title">
+        
+          Segment Tree
+        
+      </div>
+    </a>
+  
+  
+    <a href="/2024/04/15/P-NP/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">Older</strong>
+      <div class="article-nav-title">P/NP</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Algorithm/" rel="tag">Algorithm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/" rel="tag">Security</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/VPD/" rel="tag">VPD</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Algorithm/" style="font-size: 20px;">Algorithm</a> <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/VPD/" style="font-size: 10px;">VPD</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/04/">April 2024</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2024/04/15/Segment-Tree/">Segment Tree</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/String-Match/">String Match</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/P-NP/">P/NP</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/Reverse/">Reverse</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/Software-Security/">Software-Security</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2024 jackpai<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.6.4.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>
