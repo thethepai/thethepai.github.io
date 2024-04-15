@@ -69,6 +69,507 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-Reverse" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/04/15/Reverse/" class="article-date">
+  <time class="dt-published" datetime="2024-04-15T09:48:11.000Z" itemprop="datePublished">2024-04-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2024/04/15/Reverse/">Reverse</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>逆向分析实践：</p>
+<p>整数溢出，栈溢出改变程序跳转地址</p>
+<h2 id="理论"><a href="#理论" class="headerlink" title="理论"></a>理论</h2><ul>
+<li>通过strcpy函数返回时的溢出覆盖栈中数据</li>
+<li>当覆盖的内容，地址位置合适时可以影响寄存器的内容与程序的跳转</li>
+</ul>
+<h2 id="环境准备"><a href="#环境准备" class="headerlink" title="环境准备"></a>环境准备</h2><ul>
+<li><p>IDApro7.0</p>
+</li>
+<li><p>被分析的程序rev_homework.exe</p>
+</li>
+</ul>
+<h2 id="过程A"><a href="#过程A" class="headerlink" title="过程A"></a>过程A</h2><h3 id="1-分析"><a href="#1-分析" class="headerlink" title="1. 分析"></a>1. 分析</h3><p>定位到main函数：</p>
+<p><img src="/images/image-20231221200157068.png" alt="image-20231221200157068"></p>
+<p>找到输入密码的相关函数：</p>
+<p><img src="/images/image-20231221200245864.png" alt="image-20231221200245864"></p>
+<p>对于我们输入的密码，有这样的一个函数来处理：</p>
+<p>两个参数依次为字符串本身和字符串长度，如果长度在3u至8u开区间内，就会运行strcpy函数。在这一段代码中并没有关于success的痕迹，看来我们只能通过利用strcpy返回时的溢出来前往我们想要到达的地址。</p>
+<p>观察变量v3，发现[ebp-Ch]代表给它分配了12个字节的空间，如果我们的字符串超过了这个字节就有可能产生溢出，让返回值覆盖到更多的地方；同时我们要保证能通过判断条件，通过观察代码知，字符串的大小其实是判断LOBYTE()得到的，那么我们构造超过255字节的数据就行了，超过的部分在3到8字节。</p>
+<p><img src="/images/image-20231221200330676.png" alt="image-20231221200330676"></p>
+<p>找一下目的地址在哪里，搜索相关字符串：</p>
+<p><img src="/images/image-20231221201118436.png" alt="image-20231221201118436"></p>
+<p>找到对应函数的地址是004011A0：</p>
+<p><img src="/images/image-20231221201218883.png" alt="image-20231221201218883"></p>
+<h3 id="2-调试"><a href="#2-调试" class="headerlink" title="2. 调试"></a>2. 调试</h3><p>在strcpy处下断点：</p>
+<p><img src="/images/image-20231221201401199.png" alt="image-20231221201401199"></p>
+<p>在调试中我们观察EBP地址处的栈得以验证，我们的字符串要被覆盖到0019FC44这一处地址，并且配有12字节的空间，而我们要通过溢出对0019FC54地址处覆盖，因为这是EBP即将使用的地址，它依据这里的内容进行跳转。</p>
+<p><img src="/images/image-20231221201604656.png" alt="image-20231221201604656"></p>
+<p>构造相应的二进制文件，把对应字节处写上目标地址，即可实现目标：</p>
+<p><img src="/images/image-20231221202051307.png" alt="image-20231221202051307"></p>
+<h3 id="结果"><a href="#结果" class="headerlink" title="结果"></a>结果</h3><p>成功跳转到success：</p>
+<p><img src="/images/image-20231221195527182.png" alt="image-20231221195527182"></p>
+<h2 id="过程B"><a href="#过程B" class="headerlink" title="过程B"></a>过程B</h2><p>这一次分析物联网设备程序</p>
+<p>定位main函数如下：main函数主要做这几件事情</p>
+<ul>
+<li>让你输入学号后四位，存储到id，打印你输入的学号</li>
+<li>让你输入串的长度，存储到length</li>
+<li>循环读入你输入的字符串，把HEX value转化成数字，存储到v4，InputBuffer数组中</li>
+<li>调用StartFreeRTOS函数，，调用vTask函数，传入了id</li>
+</ul>
+<p><img src="/images/image-20231225195904251.png" alt="image-20231225195904251"></p>
+<p>翻找一通，StartFreeRTOS是涉及硬件任务以及权限的函数，实际处理的函数应该在vTask中，在vTask中的某一个循环内找到了这样的函数Helper：</p>
+<p>这个HelperBuffer被分配了16个字节的空间，而我们的InputBuffer被逐一复项复制到HelperBuffer中，这里应该就是溢出点了，初步思考，我们需要构造一个长串，在第17和20字节写入我们要跳转的地址</p>
+<p><img src="/images/image-20231228195524359.png" alt="image-20231228195524359"></p>
+<p>然而试了一下程序直接卡死，到底是哪里出问题了呢？原来这次实验跟之前之前那次有点不一样，很令人疑惑的是，HelpBuffer明明存储12个整型元素，但是被分配了16字节的空间，点进这个变量一看，发现他的堆栈结构如下，也就是说，我们传入16个字节就已经发生溢出了，13至16个字节的位置正好会覆盖栈中EIP的返回位置</p>
+<p><img src="/images/image-20231228212757755.png" alt="image-20231228212757755"></p>
+<p>找一下成功的输出代码在哪里，这样我们可以知道覆盖的目标，它的地址位于00009F94，由于固件特殊性，实际上地址要加1也就是00009F95：</p>
+<p><img src="/images/image-20231225203023221.png" alt="image-20231225203023221"></p>
+<p>用qemu测试一下：</p>
+<p>安装：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">wget https://download.qemu.org/qemu-7.0.0.tar.xz</span><br><span class="line">tar xvJf qemu-7.0.0.tar.xz</span><br><span class="line"><span class="built_in">cd</span> qemu-7.0.0</span><br><span class="line">sudo apt-get install ninja-build -y <span class="comment"># ninja</span></span><br><span class="line">sudo apt install libglib2.0-dev -y <span class="comment"># glib-2.56 gthread-2.0</span></span><br><span class="line">sudo apt install libpixman-1-dev -y <span class="comment"># pixman-1</span></span><br><span class="line">./configure --prefix=~/qemu-7.0.0/build --target-list=arm-softmmu --enable-debug</span><br><span class="line">make</span><br><span class="line">make install</span><br></pre></td></tr></table></figure>
+
+<p>运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> qemu-7.0.0/build</span><br><span class="line">./qemu-system-arm -M mps2-an386 -cpu cortex-m4 -m 16M -nographic -d in_asm,nochain -kernel ~/Task1_23.axf -D log.txt</span><br></pre></td></tr></table></figure>
+
+<p>成功通过：</p>
+<p><img src="/images/image-20231228212722198.png" alt="image-20231228212722198"></p>
+<h2 id="过程C"><a href="#过程C" class="headerlink" title="过程C"></a>过程C</h2><p>这次是多次跳转，不能直接跳转到flag函数，而是要先利用一些系统函数提升权限</p>
+<p>先观察一下处理输入的函数：这个和任务一单次跳转是一样的，HelpBuffer还是存储了12个整形但是分配了16字节的空间，第13个字节开始的内容会被覆盖到EIP中去。需要注意的是，下面有一个操作把所有的输入都减去1了，所以最后构造的时候记得要加1</p>
+<p><img src="/images/image-20240120133138777.png" alt="image-20240120133138777"></p>
+<p>接着寻找一下SVC中断提权函数，发现它在这个地址0x86EC，我们等一下要利用POP     {xRunningPrivileged,PC}语句来提升权限完成二次跳转，把这个地址加1，也就是0x86ED，也就是说要构造如下数据：1 1 1 1 1 1 1 1 1 1 1 1 EE 87 1 1 </p>
+<p><img src="/images/image-20240120133521518.png" alt="image-20240120133521518"></p>
+<p>接着搜索字符串找到打印flag的函数，准备构造第二份字符串，如下：在这个地址0x1C7E，按照对应的规则，我们希望执行完pop语句后EIP的值能够是打印函数的地址，我们应该构造如下的数据：1 1 1 1 80 1D 1 1</p>
+<p><img src="/images/image-20240120134041656.png" alt="image-20240120134041656"></p>
+<p>1 1 1 1 1 1 1 1 1 1 1 1 EE 87 1 1 1 1 1 1 80 1D 1 1，总长度16+8&#x3D;24，把这个shellcode输入程序运行：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> qemu-7.0.0/build</span><br><span class="line">./qemu-system-arm -M mps2-an386 -cpu cortex-m4 -m 16M -nographic -d in_asm,nochain -kernel ~/Task2_23.axf -D log.txt</span><br></pre></td></tr></table></figure>
+
+<p>成功通过：</p>
+<p><img src="/images/image-20240120141641711.png" alt="image-20240120141641711"></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://thethepai.github.io/2024/04/15/Reverse/" data-id="clv0rxit10000aovibcbe2em0" data-title="Reverse" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/" rel="tag">Security</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-Software-Security" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/04/15/Software-Security/" class="article-date">
+  <time class="dt-published" datetime="2024-04-15T09:43:28.000Z" itemprop="datePublished">2024-04-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2024/04/15/Software-Security/">Software-Security</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="1"><a href="#1" class="headerlink" title="1"></a>1</h1><p>为什么软件测试无法保证软件的安全性：</p>
+<p>软件缺陷和错误：</p>
+<h1 id="2"><a href="#2" class="headerlink" title="2"></a>2</h1><p>windwos虚拟地址空间：二级页表</p>
+<p>CPU通过二级页表将虚拟地址转化为物理地址的过程通常涉及以下步骤：</p>
+<ol>
+<li><strong>虚拟地址生成：</strong> 当程序运行时，CPU产生虚拟地址。这个虚拟地址由两部分组成：高位部分是页表项的索引，低位部分是页内偏移。</li>
+<li><strong>页表查找：</strong> CPU使用虚拟地址的高位部分作为索引，查找一级页表。这个一级页表中的页表项包含了指向二级页表的物理地址。</li>
+<li><strong>二级页表查找：</strong> CPU使用虚拟地址的低位部分作为索引，查找二级页表。这个二级页表中的页表项包含了指向实际物理页面的物理地址。</li>
+<li><strong>物理地址生成：</strong> CPU将从二级页表中获取到的物理地址与虚拟地址的低位部分（页内偏移）合并，得到最终的物理地址。</li>
+</ol>
+<p>删除文件后可以恢复：没有真的删除数据，只是删除了索引等</p>
+<hr>
+<p>PE文件结构：PE文件的结构包含以下几个主要部分：</p>
+<ol>
+<li>DOS头（DOS Header）：这部分包含了DOS可执行文件的头部信息，以便支持在DOS环境下运行。这是为了兼容早期的DOS系统。</li>
+<li>PE签名（PE Signature）：标志着文件的开始，紧接在DOS头之后，它包含一个标识PE文件的签名。</li>
+<li>COFF头（COFF Header）：COFF（Common Object File Format）头部包含了PE文件的基本信息，如节表的位置和大小、入口点地址等。</li>
+<li>节表（Section Table）：节表描述了PE文件的各个节（Sections），每个节包含特定类型的数据，例如代码、数据、资源等。节表中记录了每个节的起始位置、大小、属性等信息。</li>
+<li>数据目录表（Data Directory Table）：这个表包含了指向各种重要数据结构的指针，比如导入表、导出表、异常处理表等。这些数据结构存储了程序执行和运行时所需的关键信息。</li>
+<li>导入表（Import Table）：导入表记录了程序运行时需要引用的外部函数和库，以便在运行时解析并加载这些外部依赖。</li>
+<li>导出表（Export Table）：导出表包含了程序内部对外提供的函数和数据，允许其他程序调用这些功能。</li>
+<li>重定位表（Relocation Table）：当PE文件加载到内存时，可能会发生地址重定位，重定位表记录了需要进行重定位的位置和相应的修正信息。</li>
+</ol>
+<p>总体而言，PE文件的结构设计得相对灵活，以适应各种类型的可执行文件和动态链接库。这种结构使得Windows操作系统能够有效地加载和执行PE文件中的程序。</p>
+<hr>
+<p>PE文件与内存之间的映射：</p>
+<h1 id="3"><a href="#3" class="headerlink" title="3"></a>3</h1><p>蠕虫和计算机病毒：</p>
+<ul>
+<li>病毒应具备文件感染性，一般需要宿主程序激活恶意代码</li>
+<li>蠕虫应具备无用出发能够自动完成感染传播的特性</li>
+</ul>
+<p>后门和木马：</p>
+<ul>
+<li>木马强调伪装性质，诱导用户进行安装，并且完成远程控制监视等工作</li>
+<li>后门指的是程序中藏有的恶意功能，漏洞等</li>
+</ul>
+<h1 id="4"><a href="#4" class="headerlink" title="4"></a>4</h1><p>仅作了解</p>
+<h1 id="5"><a href="#5" class="headerlink" title="5"></a>5</h1><p>关键技术：</p>
+<ul>
+<li>重定位</li>
+<li>API函数获取</li>
+<li>目标检索</li>
+<li>感染</li>
+</ul>
+<p>API重定位技术：常见的重定位代码，巧妙使用了delta这一个标签来定位相对偏移量，并且将值存放在ebx中。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Relocate	proc</span><br><span class="line">	call	delta</span><br><span class="line">delta:</span><br><span class="line">	pop	ebx</span><br><span class="line">	sub	ebx,offset delta</span><br><span class="line">	ret</span><br><span class="line">Relocate	endp</span><br></pre></td></tr></table></figure>
+
+<p>定位Kernal32.dll模块地址：搜索PE文件结构头，通过SEH异常处理机制获取，通过PEB进程控制块数据结构获取。以下代码通过调用<code>Relocate</code>函数，然后遍历内存空间，搜索<code>kernel32.dll</code>模块的DOS和NT签名，最终返回<code>kernel32.dll</code>的基地址。如果在搜索过程中发生错误（比如签名不匹配），则会调整搜索位置并继续搜索。这是一种通用的模块基地址定位方法。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line">GetKernelBase proc dwKernelRet</span><br><span class="line">    LOCAL dwReturn</span><br><span class="line"></span><br><span class="line">    ; 调用Relocate函数</span><br><span class="line">    pushad</span><br><span class="line">    call Relocate</span><br><span class="line"></span><br><span class="line">    ; 切换到fs段，利用SEH</span><br><span class="line">    assume fs:nothing</span><br><span class="line">    push ebp</span><br><span class="line">    lea eax, [ebx + offset PageError]</span><br><span class="line">    push eax</span><br><span class="line">    lea eax, [ebx + offset SEHHandler]</span><br><span class="line">    push eax</span><br><span class="line">    push fs:[0]</span><br><span class="line">    mov fs:[0], esp</span><br><span class="line"></span><br><span class="line">    ; 初始化寄存器</span><br><span class="line">    mov edi, dwKernelRet</span><br><span class="line">    and edi, 0FFFF0000h ; 将edi寄存器的低16位清零，保留其高16位</span><br><span class="line"></span><br><span class="line">@@:</span><br><span class="line">    ; 检查模块的DOS签名</span><br><span class="line">    cmp word ptr [edi], IMAGE_DOS_SIGNATURE</span><br><span class="line">    jne PageError</span><br><span class="line"></span><br><span class="line">    ; 获取PE头地址</span><br><span class="line">    mov esi, edi</span><br><span class="line">    add esi, [esi + 003Ch]</span><br><span class="line"></span><br><span class="line">    ; 检查模块的NT签名</span><br><span class="line">    cmp word ptr [esi], IMAGE_NT_SIGNATURE</span><br><span class="line">    jne PageError</span><br><span class="line"></span><br><span class="line">    ; 如果模块符合要求，设置dwReturn为模块基地址</span><br><span class="line">    mov dwReturn, edi</span><br><span class="line">    jmp @f</span><br><span class="line"></span><br><span class="line">PageError:</span><br><span class="line">    ; 调整edi寄存器，继续搜索</span><br><span class="line">    sub edi, 010000h</span><br><span class="line">    cmp edi, 070000000h</span><br><span class="line">    jb @f</span><br><span class="line">    jmp @b</span><br><span class="line"></span><br><span class="line">@@:</span><br><span class="line">    ; 恢复fs段</span><br><span class="line">    pop fs:[0]</span><br><span class="line">    add esp, 0Ch</span><br><span class="line">    popad</span><br><span class="line"></span><br><span class="line">    ; 返回模块基地址</span><br><span class="line">    mov eax, dwReturn</span><br><span class="line">    ret</span><br><span class="line"></span><br><span class="line">GetKernelBase endp</span><br></pre></td></tr></table></figure>
+
+<p>文件感染：调用相关API函数进行文件的搜索与感染，检查条件，遍历……</p>
+<p>捆绑释放感染：将HOST作为数据存储在病毒体内，执行病毒程序时，还原并执行HOST文件。优点是编写简单高效，缺点是被感染后程序的主体是病毒文件，隐蔽性差。</p>
+<h1 id="6"><a href="#6" class="headerlink" title="6"></a>6</h1><p>宏病毒如何获得控制权：感染文档的通用模板，执行恶意功能</p>
+<p>宏病毒代码主要部分：自我保护（伪装），感染代码导出，感染代码导入</p>
+<p>脚本病毒感染文件的方法：自我复制，附加在同类程序上都能执行的特点</p>
+<p>脚本病毒对抗反病毒软件的技巧：自加密，巧妙使用敏感函数（用Execute函数），改变某些对象的声明方法，直接关闭反病毒软件。</p>
+<h1 id="7"><a href="#7" class="headerlink" title="7"></a>7</h1><p>仅作了解</p>
+<h1 id="8"><a href="#8" class="headerlink" title="8"></a>8</h1><p>仅作了解</p>
+<h1 id="9"><a href="#9" class="headerlink" title="9"></a>9</h1><p>特征值检测：详见算法笔记文件夹中的模式匹配</p>
+<p>校验和检测：</p>
+<h1 id="10"><a href="#10" class="headerlink" title="10"></a>10</h1><h2 id="漏洞引入"><a href="#漏洞引入" class="headerlink" title="漏洞引入"></a>漏洞引入</h2><p>漏洞定义：</p>
+<p>按威胁分类：</p>
+<p>漏洞生命周期：</p>
+<p>对软件系统的威胁：</p>
+<h2 id="栈"><a href="#栈" class="headerlink" title="栈"></a>栈</h2><h3 id="基础"><a href="#基础" class="headerlink" title="基础"></a>基础</h3><p>栈相关知识：</p>
+<ul>
+<li>先入后出，使用pop和push命令控制</li>
+<li>高地址向低地址生长，也就是说高地址是栈底</li>
+<li>ESP指向栈顶，EBP指向栈底<ul>
+<li>SP是栈顶指针</li>
+<li>BP是基地址指针，表示栈中相对稳定的位置</li>
+<li>IP是指令寄存器</li>
+</ul>
+</li>
+</ul>
+<p>当某个函数的栈帧被压入栈时，其中就包含着当前的IP值，即函数调用返回后下一个语句的执行地址。</p>
+<p>函数执行过程：</p>
+<ul>
+<li>把函数所需要的参数压入栈</li>
+<li>保存指令寄存器中的内容，作为返回地址放入堆栈当前的基址寄存器</li>
+<li>把当前的栈指针(ESP)拷贝到基址寄存器作为新的基地址</li>
+<li>为本地变量留出一定空间，把ESP减去适当的数值</li>
+</ul>
+<p><img src="/images/image-20240115204318858.png" alt="image-20240115204318858"></p>
+<h3 id="利用：shellcode"><a href="#利用：shellcode" class="headerlink" title="利用：shellcode"></a>利用：shellcode</h3><h4 id="jmp-esp"><a href="#jmp-esp" class="headerlink" title="jmp esp"></a>jmp esp</h4><ol>
+<li><strong>初始状态：</strong><ul>
+<li>程序执行到一个函数的返回点，即将执行 <code>ret</code> 指令。</li>
+<li>栈上存放了原始的返回地址，指向程序正常执行的下一个指令。</li>
+</ul>
+</li>
+<li><strong>栈布局：</strong><ul>
+<li>在输入中溢出缓冲区，覆盖函数的返回地址为攻击者预先准备的地址。</li>
+<li>这个地址是存放着 <code>jmp esp</code> 指令的位置。</li>
+</ul>
+</li>
+<li><strong><code>jmp esp</code> 指令执行：</strong><ul>
+<li><code>ret</code> 指令被执行，从栈上弹出了攻击者提供的地址，即 <code>jmp esp</code> 指令的地址。</li>
+<li>控制流跳转到了 <code>jmp esp</code> 指令所在的位置，即栈上的某个地址。</li>
+</ul>
+</li>
+<li><strong>执行 shellcode：</strong><ul>
+<li>ESP 寄存器此时指向了栈顶，而栈顶上存放着 <code>jmp esp</code> 指令的地址。</li>
+<li><code>jmp esp</code> 指令执行后，控制流跳转到了这个地址，即栈上的某个位置。</li>
+<li>在这个位置通常存放着攻击者精心构造的 shellcode。</li>
+<li>程序开始执行 shellcode，实现攻击者的恶意目的。</li>
+</ul>
+</li>
+</ol>
+<h4 id="SEH链"><a href="#SEH链" class="headerlink" title="SEH链"></a>SEH链</h4><ul>
+<li>SEH为结构化异常处理</li>
+<li>SEH结构一般在栈空间附近，溢出可以覆盖到</li>
+</ul>
+<p>异常处理句柄赋值为类似jmp esp的语句，指向shell code</p>
+<h3 id="练习"><a href="#练习" class="headerlink" title="练习"></a>练习</h3><p><img src="/images/91500f3fe5c0e448eca4729a724a78f7.png" alt="91500f3fe5c0e448eca4729a724a78f7"></p>
+<p>50个数据之后的数据会溢出，覆盖p（指针变量，4字节）、覆盖EBP（四字节），然后就是覆盖EIP（四字节），一个字节一个字符，存到eip正好是ccdd，小端存储则为地址0x64646363。注意：如果题目有说明，可能需要考虑内存对齐，比如<code>sizeof(s1)%4==0</code>，这既是说，写下<code>char s1[50]</code>，其实会分配52字节的空间，那么答案就不是ccdd而是ddee。</p>
+<h2 id="堆"><a href="#堆" class="headerlink" title="堆"></a>堆</h2><h3 id="基础-1"><a href="#基础-1" class="headerlink" title="基础"></a>基础</h3><p>堆用于存放程序运行中，请求操作系统分配给自己的内存段，每一个进程有自己的堆。</p>
+<ul>
+<li>大小不固定</li>
+<li>内存不一定连续</li>
+<li>操作系统可能采用链表管理</li>
+<li>提供进程生命周期存放数据的区域</li>
+</ul>
+<p>堆结构：</p>
+<ul>
+<li><p>堆表、</p>
+<ul>
+<li><p>空表，用于标识空闲块，结构如下：</p>
+<ul>
+<li>空表则是指未分配的内存块链表。当程序释放一块内存时，这块内存会被添加到空表中，以便下次程序需要分配内存时可以从空表中选择一块合适的内存块分配给程序使用。</li>
+</ul>
+</li>
+<li><p>快表，记录堆结构的状态，用于分配内存空间：</p>
+<ul>
+<li>在堆表中，快表通常指的是一组小型的、固定大小的内存块链表，用于快速分配和释放小块内存。这些块的大小一般是固定的，这样可以提高内存分配和释放的效率。快表中的内存块通常是由一些常用的大小组成，以加速分配和释放操作。</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>堆块：块首，块身</p>
+<ul>
+<li><strong>块大小信息：</strong> 记录了当前内存块的大小，以便系统知道这个块能够存储多少数据。</li>
+<li><strong>块状态信息：</strong> 用于标识当前内存块的状态，是已分配还是未分配。</li>
+<li><strong>前向指针和后向指针：</strong> 这两个指针通常存在于空闲的堆块中，用于构成一个链表，将空闲的堆块串联在一起，以便更快速地进行内存的分配和释放。前向指针指向链表中下一个空闲块，后向指针指向链表中上一个空闲块。这样，当程序需要分配内存时，可以在这个链表中找到一个足够大的未分配块，而当程序释放内存时，可以将这个块添加到链表中。</li>
+<li><strong>数据区：</strong> 存储实际的用户数据，这是程序通过内存分配所获得的可用空间。</li>
+</ul>
+</li>
+</ul>
+<p>在已占用的堆块中，通常不需要前向和后向指针。已分配的堆块的元数据通常由分配器进行管理，这些信息存储在堆块之前或之后的某个位置，以便程序能够正确地进行内存释放。分配器会追踪已分配的块的大小和状态，因此不需要链表来管理已占用的块。</p>
+<h3 id="堆溢出利用，喷射"><a href="#堆溢出利用，喷射" class="headerlink" title="堆溢出利用，喷射"></a>堆溢出利用，喷射</h3><h4 id="堆溢出"><a href="#堆溢出" class="headerlink" title="堆溢出"></a>堆溢出</h4><p>如果我们在分配完buf1后往里面赋值，溢出覆盖掉两个指针，下一次分配buf2时如果没有释放buf1，那么就会把4字节的内容写入到一个地址当中，而这个内容和这个地址都是可以控制的。</p>
+<p><img src="/images/image-20240116170253229.png" alt="image-20240116170253229"></p>
+<h4 id="Heap-spray"><a href="#Heap-spray" class="headerlink" title="Heap spray"></a>Heap spray</h4><ul>
+<li>向堆中注入大量数据，使得数据填满特定内存地址空间，当栈溢出时可以引导EIP到堆的空间。</li>
+<li>injected data &#x3D; slide code + shell code</li>
+</ul>
+<p>思想：用相同的指令去覆盖大量地址，在每一块分配到的内存最后都加上shellcode。这个指令的要求是，相当于NOP指令，并且该指令指向的地址正好就落在覆盖的这片大内存地址中。比如使用0x0c0c0c0c（OR AL,0C）进行覆盖，只要eip指向了这个指令，就会一直执行下去直到shellcode。</p>
+<h4 id="UAF，野指针"><a href="#UAF，野指针" class="headerlink" title="UAF，野指针"></a>UAF，野指针</h4><p>如果攻击者可以操纵p1，则在p1指向的内存被释放后，程序再次申请内存，由于p1没有被赋值为NULL，攻击者可向p1指向的内存 写入精心构造的Shellcode或采用其他方式改变程序控制流。</p>
+<h4 id="格式化字符串"><a href="#格式化字符串" class="headerlink" title="格式化字符串"></a>格式化字符串</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;AAAA%08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x.&quot;</span>, ...);</span><br></pre></td></tr></table></figure>
+
+<p>这个格式化字符串包含了多个<code>%08x</code>，表示以16进制输出的整数，并且宽度为8个字符，左侧用0填充。然而，在实际参数列表中并没有相应数量的参数。如果没有正确匹配的参数，<code>printf()</code>会在堆栈中寻找额外的参数，导致读取或写入到未知内存位置。</p>
+<h2 id="整数溢出"><a href="#整数溢出" class="headerlink" title="整数溢出"></a>整数溢出</h2><p>定义：字面意思，好好理解。</p>
+<h3 id="例子"><a href="#例子" class="headerlink" title="例子"></a>例子</h3><p><strong>宽度溢出</strong>，代码中，存在整数溢出的潜在问题。让我们来分析一下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span> &#123;</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">short</span> s;</span><br><span class="line">    <span class="type">int</span> i;</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">80</span>];</span><br><span class="line">    i = atoi(argv[<span class="number">1</span>]);</span><br><span class="line">    s = i;</span><br><span class="line">    <span class="keyword">if</span> (s &gt;= <span class="number">80</span>)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    <span class="built_in">memcpy</span>(buf, argv[<span class="number">2</span>], i);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>潜在问题点：</p>
+<ol>
+<li><strong>atoi的使用：</strong> <code>atoi</code> 函数将字符串转换为整数。如果用户提供的 <code>argv[1]</code> 中的字符串不能被合理转换为整数，<code>atoi</code> 将返回零。这可能导致 <code>i</code> 的值为零，而在后续的代码中可能会引发问题。建议使用更安全的转换函数，如 <code>strtol</code>，并检查转换是否成功。</li>
+<li><strong>unsigned short 转换：</strong> <code>int</code> 类型的值被赋值给 <code>unsigned short</code> 类型的变量 <code>s</code>，这可能导致整数截断。如果 <code>i</code> 的值大于 <code>USHRT_MAX</code>（<code>unsigned short</code> 类型的最大值），则 <code>s</code> 将溢出。应该确保在进行类型转换之前检查 <code>i</code> 的值是否在合理的范围内。</li>
+<li><strong>memcpy 长度检查不足：</strong> 对于 <code>memcpy</code> 的调用，目标缓冲区是 <code>buf</code>，而复制的长度是 <code>i</code>。如果 <code>i</code> 大于等于 80，将超出 <code>buf</code> 的范围，导致缓冲区溢出。应该确保复制的长度不超过目标缓冲区的大小。</li>
+</ol>
+<hr>
+<p><strong>运算溢出</strong>，代码中，有一处可能导致整数溢出的潜在问题。让我们来分析一下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">CopyIntArray</span><span class="params">(<span class="type">int</span> *<span class="built_in">array</span>, <span class="type">int</span> len)</span> &#123;</span><br><span class="line">    <span class="type">int</span> *myarray;</span><br><span class="line">    <span class="type">int</span> i;</span><br><span class="line">    myarray = <span class="built_in">malloc</span>(len * <span class="keyword">sizeof</span>(<span class="type">int</span>));</span><br><span class="line">    <span class="keyword">if</span> (myarray == <span class="literal">NULL</span>)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; len; i++)</span><br><span class="line">        myarray[i] = <span class="built_in">array</span>[i]; <span class="comment">// 拼写错误，应该是 array[i]</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>潜在问题点：</p>
+<ol>
+<li><strong>拼写错误：</strong> 在 <code>myarray[i] = arrary[i];</code> 中，<code>arrary</code> 是一个拼写错误，应该是 <code>array</code>。这可能导致未定义行为或程序错误，因为 <code>arrary</code> 并没有被定义。</li>
+<li><strong>整数溢出：</strong> 在 <code>malloc(len * sizeof(int));</code> 中，<code>len * sizeof(int)</code> 可能导致整数溢出，特别是当 <code>len</code> 是一个很大的正整数时。这是因为 <code>len * sizeof(int)</code> 的结果可能超过 <code>int</code> 类型所能表示的最大值。</li>
+</ol>
+<hr>
+<p><strong>符号溢出</strong>，代码中，存在一个潜在的整数溢出问题。让我们来分析一下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">char</span> data[<span class="number">256</span>]; </span><br><span class="line"><span class="type">int</span> <span class="title function_">store_data</span><span class="params">(<span class="type">char</span> *buf, <span class="type">int</span> len)</span></span><br><span class="line">&#123; </span><br><span class="line">    <span class="keyword">if</span>(len &gt; <span class="number">256</span>) </span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>; </span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">memcpy</span>(data, buf, len); </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>潜在问题点：</p>
+<ol>
+<li><strong>返回值类型不匹配：</strong> <code>memcpy</code> 函数返回一个指向目标缓冲区的指针，而 <code>store_data</code> 函数声明的返回类型是 <code>int</code>。这会导致类型不匹配，可能引起问题。建议使用 <code>size_t</code> 类型，这是 <code>memcpy</code> 函数返回的类型，以适应实际的返回值。</li>
+<li><strong>整数溢出：</strong> <code>if(len &gt; 256)</code> 检查确保 <code>len</code> 不超过 256，但是这并不足以防止整数溢出。在 <code>memcpy(data, buf, len)</code> 中，如果 <code>len</code> 是负数，它将被转换为一个很大的正数，导致超出 <code>data</code> 数组的范围。应该确保 <code>len</code> 是非负的。</li>
+</ol>
+<h3 id="解决"><a href="#解决" class="headerlink" title="解决"></a>解决</h3><ul>
+<li>避免隐患运算，如正数相加，相乘</li>
+<li>越界判断，整数安全意识等等</li>
+</ul>
+<h3 id="练习-1"><a href="#练习-1" class="headerlink" title="练习"></a>练习</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">short</span> a = (<span class="type">short</span>)<span class="number">0xFFFF</span>;</span><br><span class="line">    <span class="type">int</span> b;</span><br><span class="line">    b = a;</span><br><span class="line">    </span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Size of short: %zu bytes\n&quot;</span>, <span class="keyword">sizeof</span>(<span class="type">short</span>));</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Size of int: %zu bytes\n&quot;</span>, <span class="keyword">sizeof</span>(<span class="type">int</span>));</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;b=%d    \r\n&quot;</span>, b);</span><br><span class="line">    b = (a &amp; <span class="number">0xFFFF</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;b=%d    \r\n&quot;</span>, b);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>输出：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">b=-1</span><br><span class="line">b=65535</span><br></pre></td></tr></table></figure>
+
+<p>解析：</p>
+<p>这段代码首先定义了一个 <code>short</code> 类型的变量 <code>a</code>，并将其初始化为 <code>0xFFFF</code>，这是一个16位的二进制数，所有位都是1。在 C 语言中，<code>short</code> 类型是有符号的，所以 <code>0xFFFF</code> 实际上表示的是 <code>-1</code>。</p>
+<p>然后，代码将 <code>a</code> 的值赋给了一个 <code>int</code> 类型的变量 <code>b</code>。由于 <code>int</code> 类型通常比 <code>short</code> 类型有更多的位（通常是32位），所以在赋值过程中，<code>a</code> 的值会被符号扩展。也就是说，如果 <code>a</code> 的最高位（符号位）是1，那么在赋值给 <code>b</code> 时，<code>b</code> 的高位也会被设置为1。因此，<code>b</code> 的值也会是 <code>-1</code>。</p>
+<p>接下来，代码打印了 <code>b</code> 的值，所以第一行输出应该是 <code>b=-1</code>。</p>
+<p><strong>然后</strong>，代码将 <code>a</code> 与 <code>0xFFFF</code> 进行了位与操作，并将结果赋给了 <code>b</code>。在 C 语言中，<code>0xFFFF</code> 是一个字面量，其默认类型是 <code>int</code>。当你写 <code>a &amp; 0xFFFF</code> 时，<code>a</code> 是 <code>short</code> 类型，<code>0xFFFF</code> 是 <code>int</code> 类型，所以在进行位与操作之前，<code>a</code> 会被提升为 <code>int</code> 类型以匹配 <code>0xFFFF</code> 的类型。这个过程被称为整数提升。所以，这一次赋值过程中不会发生符号扩展，这次 <code>b</code> 是直接被赋值为 <code>0xFFFF</code>，并没有发生符号扩展。因此，<code>b</code> 的值会被解释为无符号整数，即 <code>65535</code>。</p>
+<p>最后，代码再次打印了 <code>b</code> 的值，所以第二行输出应该是 <code>b=65535</code>。</p>
+<h2 id="漏洞利用与发现"><a href="#漏洞利用与发现" class="headerlink" title="漏洞利用与发现"></a>漏洞利用与发现</h2><h3 id="目标与整体流程"><a href="#目标与整体流程" class="headerlink" title="目标与整体流程"></a>目标与整体流程</h3><ul>
+<li>修改内存变量</li>
+<li>修改代码逻辑，跳转</li>
+<li>修改函数返回地址</li>
+<li>修改函数指针</li>
+<li>修改异常处理函数指针，比如SEH</li>
+<li>修改线程同步函数指针</li>
+</ul>
+<h3 id="shellcode"><a href="#shellcode" class="headerlink" title="shellcode"></a>shellcode</h3><p>API重定位技术：常见的重定位代码，巧妙使用了delta这一个标签来定位相对偏移量，并且将值存放在ebx中。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Relocate	proc</span><br><span class="line">	call	delta</span><br><span class="line">delta:</span><br><span class="line">	pop	ebx</span><br><span class="line">	sub	ebx,offset delta</span><br><span class="line">	ret</span><br><span class="line">Relocate	endp</span><br></pre></td></tr></table></figure>
+
+<h3 id="Return-Oriented-Programming"><a href="#Return-Oriented-Programming" class="headerlink" title="Return-Oriented-Programming"></a>Return-Oriented-Programming</h3><p>为了应对DEP保护而出现的攻击机制，DEP保护指的是内存分块后设置不同的权限，数据区块仅有读写权限无法执行，这样那里的shellcode就不能起作用了。</p>
+<p>shellcode的解决办法：向其他地方借代码，利用系统提供的API函数关闭DEP功能。</p>
+<p><img src="/images/image-20240116192733134.png" alt="image-20240116192733134"></p>
+<h4 id="练习："><a href="#练习：" class="headerlink" title="练习："></a>练习：</h4><p>假设内存中存在各种所需的ROP代码段，并且已知一个数存放在0x0A69地址，另外一个数存在0x0A89地址，尝试利用ROP设计一个完成0x0A69所在的值减去0x0A89所在的值，并将结果保存到0x0AF0：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">0xA: pop eax; ret</span><br><span class="line">0xB: mov ebx,[eax]; ret</span><br><span class="line">0xC: mov ecx,[eax]; ret</span><br><span class="line">0xD: sub ebx,ecx; ret</span><br><span class="line">0xE: mov [eax],ebx; ret</span><br><span class="line"></span><br><span class="line">;stack:</span><br><span class="line">esp		0xA</span><br><span class="line">esp+4	0x0A69</span><br><span class="line">esp+8	0xB</span><br><span class="line">esp+12	0xA</span><br><span class="line">esp+16	0x0A89</span><br><span class="line">esp+20	0xC</span><br><span class="line">esp+24	0xD</span><br><span class="line">esp+28	0xA</span><br><span class="line">esp+32	0x0AF0</span><br><span class="line">esp+36	0xE</span><br></pre></td></tr></table></figure>
+
+<p>思想：EIP从栈中取得执行指令的地址，返回后EIP从移动后的栈顶取得返回后将要执行指令的地址。</p>
+<ul>
+<li>先执行0xA语句，pop出第一个数的地址到eax中，接着ret返回的地址是0xB</li>
+<li>执行0xB的语句，把第一个数存入ebx，ret返回的地址是0xA</li>
+<li>执行0xA的语句，pop出第二个数的地址到eax中，接着ret返回的地址是0xC</li>
+<li>执行0xC的语句，把第二个数存入ecx，接着ret返回的地址是0xD</li>
+<li>执行0xD的语句，两数相减并存放在ebx中，接着ret返回的地址是0xA</li>
+<li>执行0xA的语句，将存储目标地址pop到exa中，接着ret返回的地址是0xE</li>
+<li>执行0xE的语句，将ebx的数据写入目标地址。</li>
+</ul>
+<h3 id="静态分析，动态分析"><a href="#静态分析，动态分析" class="headerlink" title="静态分析，动态分析"></a>静态分析，动态分析</h3><p>软件漏洞挖掘技术：</p>
+<ul>
+<li>静态分析，扫描源码，软件中可能出现的漏洞</li>
+<li>动态分析，收集运行过程中的信息，检测可能的漏洞</li>
+</ul>
+<p>Fuzzing模糊测试：对程序输入不正确、异常或随机的数据来评估稳定性和安全性。</p>
+<p>Fuzzing的难点和提高效率：输入值在特定小范围引发的异常，几个输入同时作用下引发的异常，需要满足特定的数据、文件格式后才引发的异常。提高Fuzzing的效率的方法包括使用更智能的输入生成策略，如输入的格式分割，输入的字段的约束，输入的字段之间的约束等。</p>
+<h1 id="11"><a href="#11" class="headerlink" title="11"></a>11</h1><p>win系统安全机制以及漏洞防护技术</p>
+<h2 id="DEP-NX"><a href="#DEP-NX" class="headerlink" title="DEP&#x2F;NX"></a>DEP&#x2F;NX</h2><p>DEP数据执行保护，前文提到过，由于shellcode一般位于堆栈中，因此可以限制数据区的执行权限，禁用堆栈中代码的执行，实现代码和数据的分离。</p>
+<p>许多现代的CPU都支持DEP特性。</p>
+<p>当然，可以通过Ret2Libc，ROP等方法绕过DEP保护。</p>
+<p>缺陷：兼容性问题；不方便进行测试与调试等；无法防御ROP，Ret2Libc等代码借用的攻击。</p>
+<h2 id="Stack-Guard-Stack-Canary"><a href="#Stack-Guard-Stack-Canary" class="headerlink" title="Stack Guard&#x2F;Stack Canary"></a>Stack Guard&#x2F;Stack Canary</h2><p>GS（就是GS）栈溢出检查，在函数开始时往栈中压入一个可检验的随机数，函数结束时验证栈中的随机数是否不变，由此来防止栈溢出。</p>
+<p>现代编译器基本支持该安全措施。</p>
+<p>当然，可以通过利用未被保护的函数，覆盖虚函数，攻击异常处理，同时替换栈和data中的cookie绕过。</p>
+<p>缺陷：性能损失；应用场景受限，不能覆盖所有类型的函数（如不包含缓冲区的函数等）等等；同时也无法防御堆溢出攻击；无法防御改写函数指针的攻击（C++虚函数）。</p>
+<h2 id="ASLR"><a href="#ASLR" class="headerlink" title="ASLR"></a>ASLR</h2><p>ASLR地址空间布局随机化，堆栈的基地址是加载时动态随机确定的，程序自身和关联库的基地址是加载时动态随机确定的，比如每次加载dll动态链接库时使用不同的地址，kernel32，系统函数，库函数的地址随机化等等等等。</p>
+<p>windows早已支持ASLR，visual studio可以设置动态加载库的基地址。</p>
+<p>缺陷：兼容性问题，一些需要特定内存地址布局的程序会出问题；需要配合DEP，否则还是可以获得基地址；ASLR的熵比较小，只有255；地址的部分字节随机而已，并不是完全随机。</p>
+<h1 id="12"><a href="#12" class="headerlink" title="12"></a>12</h1><p>威胁建模过程</p>
+<p>威胁树：对威胁分类后，对可能遭受的威胁进行描述：</p>
+<p><img src="/images/image-20240116205237182.png" alt="image-20240116205237182"></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://thethepai.github.io/2024/04/15/Software-Security/" data-id="clv0rs2sg000060vi72hk5k5c" data-title="Software-Security" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/" rel="tag">Security</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-Net-Security" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/04/15/Net-Security/" class="article-date">
+  <time class="dt-published" datetime="2024-04-15T09:38:00.000Z" itemprop="datePublished">2024-04-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2024/04/15/Net-Security/">Net-Security</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>试验记录：使用snort提示对应网络入侵</p>
+<h2 id="实验1"><a href="#实验1" class="headerlink" title="实验1"></a>实验1</h2><h3 id="1"><a href="#1" class="headerlink" title="1"></a>1</h3><p>环境为docker desktop for windows，安装好docker-snort，请使用管理员权限：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run -it --<span class="built_in">rm</span> --net=host linton/docker-snort /bin/bash</span><br></pre></td></tr></table></figure>
+
+<p>启动，规则文件位于<code>/etc/snort/rules/local.rules</code>，配置文件位于<code>/etc/snort/etc/snort.conf</code>。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -i eth0 -c /etc/snort/etc/snort.conf -A console</span><br></pre></td></tr></table></figure>
+
+<p>添加规则（其实已经添加好了），在docker desktop中开另一个终端ping一下，测试自定义的规则能不能检测到ping操作：</p>
+<p><img src="/images/image-20240104191835897.png" alt="image-20240104191835897"></p>
+<h3 id="2"><a href="#2" class="headerlink" title="2"></a>2</h3><p>容器中安装nmap：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo apt-get update</span><br><span class="line">sudo apt-get install nmap</span><br></pre></td></tr></table></figure>
+
+<p>添加规则：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alert icmp any any -&gt; 8.8.8.8 any (msg:<span class="string">&quot;NMAP Ping Sweep Scan&quot;</span>;dsize:0;sid:1000004;)</span><br></pre></td></tr></table></figure>
+
+<p>启动：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -i eth0 -c /etc/snort/etc/snort.conf -A console</span><br></pre></td></tr></table></figure>
+
+<p>在docker desktop中再开一个终端，运行nmap扫描命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nmap -sP 8.8.8.8 -disable-arp-ping</span><br></pre></td></tr></table></figure>
+
+<p>观察一下能否检测到这个扫描操作：</p>
+<p><img src="/images/image-20240104200220391.png" alt="image-20240104200220391"></p>
+<h2 id="实验2"><a href="#实验2" class="headerlink" title="实验2"></a>实验2</h2><h3 id="1-1"><a href="#1-1" class="headerlink" title="1"></a>1</h3><p>用wireshark打开<code>log4j-attempts.pcap</code>，观察一下log4j攻击的特征：</p>
+<p><img src="/images/image-20240104215541897.png" alt="image-20240104215541897"></p>
+<p>使用log4j相关的pcap文件，将<code>log4j-attempts.pcap</code>放在pcap目录下，然后用<code>docker cp</code>命令复制到容器里面去：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">docker ps</span><br><span class="line">docker <span class="built_in">cp</span> [<span class="built_in">dir</span>] [docker <span class="built_in">id</span>]:/home/</span><br></pre></td></tr></table></figure>
+
+<p>具体情形如下：</p>
+<p><img src="/images/image-20240104212909461.png" alt="image-20240104212909461"></p>
+<p>在<code>local.rules</code>中添加检测log4j攻击的规则：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alert tcp any any -&gt; any 80 (content:<span class="string">&quot;jndi:ldap://&quot;</span>;content:<span class="string">&quot;GET&quot;</span>;http_method;sid:1000000;)</span><br></pre></td></tr></table></figure>
+
+<p>运行snort，检测log4j攻击：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -r /home/pcap/log4j-attempts.pcap -c snort.conf -A console</span><br></pre></td></tr></table></figure>
+
+<p>启动：</p>
+<p><img src="/images/image-20240104213014573.png" alt="image-20240104213014573"></p>
+<p>捕获攻击网络包如下：</p>
+<p><img src="/images/image-20240104213059241.png" alt="image-20240104213059241"></p>
+<p>结果产生安全警告如下：</p>
+<p><img src="/images/image-20240104213121432.png" alt="image-20240104213121432"></p>
+<h3 id="2-1"><a href="#2-1" class="headerlink" title="2"></a>2</h3><p>用wireshark打开<code>mirai.pcap</code>，观察一下mirai攻击的特征：</p>
+<p>![image-20240104222223894](..&#x2F;~picture bed&#x2F;netsecurity.assets&#x2F;image-20240104222223894.png)</p>
+<p>使用mirai相关的pcap文件，将<code>mirai.pcap</code>放在pcap2目录下，然后用<code>docker cp</code>命令复制到容器里面去：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">docker ps</span><br><span class="line">docker <span class="built_in">cp</span> [<span class="built_in">dir</span>] [docker <span class="built_in">id</span>]:/home/</span><br></pre></td></tr></table></figure>
+
+<p>具体情形如下：</p>
+<p><img src="/images/image-20240104223317929.png" alt="image-20240104223317929"></p>
+<p>在<code>local.rules</code>中添加检测mirai攻击的规则：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">alert tcp any any -&gt; any 23 (content:<span class="string">&quot;12345&quot;</span>;content:<span class="string">&quot;123456&quot;</span>;sid:1000000;)</span><br><span class="line"><span class="comment"># 23端口改成any也可以，这样扫的范围更广</span></span><br></pre></td></tr></table></figure>
+
+<p>运行snort，检测log4j攻击：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -r /home/pcap2/mirai.pcap -c snort.conf -A console</span><br></pre></td></tr></table></figure>
+
+<p>启动：</p>
+<p><img src="/images/image-20240104223601542.png" alt="image-20240104223601542"></p>
+<p>捕获攻击网络包如下：</p>
+<p><img src="/images/image-20240104223648984.png" alt="image-20240104223648984"></p>
+<p>结果产生安全警告如下：</p>
+<p><img src="/images/image-20240104223712063.png" alt="image-20240104223712063"></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://thethepai.github.io/2024/04/15/Net-Security/" data-id="clv0riozk000044vig6vq6vmy" data-title="Net-Security" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Security/" rel="tag">Security</a></li></ul>
+
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-VPD" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2024/04/15/VPD/" class="article-date">
@@ -112,10 +613,12 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://thethepai.github.io/2024/04/15/VPD/" data-id="clv0gpes10000igvibhbe1sj5" data-title="VPD" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://thethepai.github.io/2024/04/15/VPD/" data-id="clv0qoxyt00068cviav0dh05i" data-title="VPD" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/VPD/" rel="tag">VPD</a></li></ul>
+
     </footer>
   </div>
   
@@ -239,7 +742,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://thethepai.github.io/2024/04/14/Block-Chain/" data-id="cluzo1hlr0000rwvif5nqhll5" data-title="Block Chain" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://thethepai.github.io/2024/04/14/Block-Chain/" data-id="clv0qoxyo00018cvi7mqe939l" data-title="Block Chain" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
@@ -344,7 +847,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://thethepai.github.io/2024/04/14/HyperV-WSL/" data-id="cluzl9uv300001wviefisahia" data-title="HyperV/WSL" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://thethepai.github.io/2024/04/14/HyperV-WSL/" data-id="clv0qoxyq00038cvibdt657ti" data-title="HyperV/WSL" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
@@ -429,61 +932,12 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://thethepai.github.io/2024/04/14/VPD-test/" data-id="cluzl9uv700011wvi4z7s6lbs" data-title="VPD test" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://thethepai.github.io/2024/04/14/VPD-test/" data-id="clv0qoxyr00048cvi55iv34zj" data-title="VPD test" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
-    </footer>
-  </div>
-  
-</article>
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/VPD/" rel="tag">VPD</a></li></ul>
 
-
-
-  
-    <article id="post-hello-world" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
-  <div class="article-meta">
-    <a href="/2024/04/14/hello-world/" class="article-date">
-  <time class="dt-published" datetime="2024-04-14T12:37:49.953Z" itemprop="datePublished">2024-04-14</time>
-</a>
-    
-  </div>
-  <div class="article-inner">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="p-name article-title" href="/2024/04/14/hello-world/">Hello World</a>
-    </h1>
-  
-
-      </header>
-    
-    <div class="e-content article-entry" itemprop="articleBody">
-      
-        <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-
-      
-    </div>
-    <footer class="article-footer">
-      <a data-url="http://thethepai.github.io/2024/04/14/hello-world/" data-id="cluzkia9t0000f0vihs4c4go7" data-title="Hello World" class="article-share-link"><span class="fa fa-share">Share</span></a>
-      
-      
-      
     </footer>
   </div>
   
@@ -502,9 +956,23 @@
 
   
     
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/Security/" rel="tag">Security</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/VPD/" rel="tag">VPD</a></li></ul>
+    </div>
+  </div>
+
 
   
     
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/Security/" style="font-size: 20px;">Security</a> <a href="/tags/VPD/" style="font-size: 10px;">VPD</a>
+    </div>
+  </div>
+
   
     
   <div class="widget-wrap">
@@ -523,23 +991,23 @@
       <ul>
         
           <li>
+            <a href="/2024/04/15/Reverse/">Reverse</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/Software-Security/">Software-Security</a>
+          </li>
+        
+          <li>
+            <a href="/2024/04/15/Net-Security/">Net-Security</a>
+          </li>
+        
+          <li>
             <a href="/2024/04/15/VPD/">VPD</a>
           </li>
         
           <li>
             <a href="/2024/04/14/Block-Chain/">Block Chain</a>
-          </li>
-        
-          <li>
-            <a href="/2024/04/14/HyperV-WSL/">HyperV/WSL</a>
-          </li>
-        
-          <li>
-            <a href="/2024/04/14/VPD-test/">VPD test</a>
-          </li>
-        
-          <li>
-            <a href="/2024/04/14/hello-world/">Hello World</a>
           </li>
         
       </ul>
