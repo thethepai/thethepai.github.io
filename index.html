@@ -69,6 +69,61 @@
       <div class="outer">
         <section id="main">
   
+    <article id="post-VPD" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/04/15/VPD/" class="article-date">
+  <time class="dt-published" datetime="2024-04-15T04:35:30.000Z" itemprop="datePublished">2024-04-15</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2024/04/15/VPD/">VPD</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>oracle数据库VPD策略机制</p>
+<h2 id="DBMS-RLS包"><a href="#DBMS-RLS包" class="headerlink" title="DBMS_RLS包"></a>DBMS_RLS包</h2><p>DBMS_RLS（Row-Level Security）是Oracle数据库中的一个包，它提供了一些函数和过程，用于实现行级安全性控制。下面是DBMS_RLS包中一些重要的函数和过程的详细介绍：</p>
+<ol>
+<li>ADD_POLICY：这个过程用于向指定的表添加一个行级安全性策略。它需要指定对象的模式名、对象名、策略名、策略函数的模式名、策略函数名以及适用的语句类型。</li>
+<li>DROP_POLICY：这个过程用于从指定的表中删除一个行级安全性策略。它需要指定对象的模式名、对象名和策略名。</li>
+<li>ENABLE_POLICY：这个过程用于启用或禁用指定表的行级安全性策略。它需要指定对象的模式名、对象名、策略名、策略类型以及是否启用。</li>
+<li>DISABLE_POLICY：这个过程用于禁用指定表的行级安全性策略。它需要指定对象的模式名、对象名和策略名。</li>
+<li>EVALUATE_PREDICATE：这个函数用于在给定的表上评估行级安全性谓词。它需要指定对象的模式名、对象名、列名和行ID，返回一个布尔值，表示谓词是否为真。</li>
+<li>ALTER_POLICY：这个过程用于修改指定表的行级安全性策略。它可以修改策略的名称、策略函数、适用的语句类型和策略类型。</li>
+<li>VALIDATE_POLICY：这个过程用于验证指定表的行级安全性策略是否有效。它需要指定对象的模式名、对象名和策略名。</li>
+<li>POLICY_CONTEXT：这个函数用于获取当前会话中的行级安全性上下文信息。它可以返回当前用户、当前角色、当前会话ID等上下文信息。</li>
+</ol>
+<p>DBMS_RLS包中的这些函数和过程提供了管理行级安全性策略的基本操作。通过使用这些函数和过程，管理员可以定义、修改、删除和验证行级安全性策略，以实现对数据库中数据的细粒度访问控制。同时，通过EVALUATE_PREDICATE函数和POLICY_CONTEXT函数，可以在应用程序中动态地评估行级安全性谓词和获取行级安全性上下文信息，从而实现更灵活和动态的安全性控制。</p>
+<h2 id="基本使用格式"><a href="#基本使用格式" class="headerlink" title="基本使用格式"></a>基本使用格式</h2><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">CREATE OR REPLACE FUNCTION func0(</span><br><span class="line">p_schema in varchar2,</span><br><span class="line">p_object in varchar2)</span><br><span class="line">return varchar2</span><br><span class="line">AS</span><br><span class="line">BEGIN</span><br><span class="line">RETURN &#x27;ename=sys_context(&quot;USERENV&quot;,&quot;SESSION_USER&quot;)&#x27;;</span><br><span class="line">END;</span><br><span class="line"></span><br><span class="line">BEGIN</span><br><span class="line">dbms_rls.add_policy(</span><br><span class="line">object_schema=&gt;&#x27;SYS&#x27;,</span><br><span class="line">object_name=&gt;&#x27;TEST01&#x27;,</span><br><span class="line">policy_name=&gt;&#x27;MY_POLICY&#x27;,</span><br><span class="line">policy_function=&gt;&#x27;func0&#x27;,</span><br><span class="line">statement_types =&gt; &#x27;SELECT,UPDATE,DELETE&#x27;</span><br><span class="line">);</span><br><span class="line">END;</span><br></pre></td></tr></table></figure>
+
+<h2 id="应用程序上下文"><a href="#应用程序上下文" class="headerlink" title="应用程序上下文"></a>应用程序上下文</h2><p>使用应用程序上下文来简化行级访问控制的实现</p>
+<p>应用程序上下文总是由用户sys拥有</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://thethepai.github.io/2024/04/15/VPD/" data-id="clv0gpes10000igvibhbe1sj5" data-title="VPD" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
     <article id="post-Block-Chain" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2024/04/14/Block-Chain/" class="article-date">
@@ -466,6 +521,10 @@
     <h3 class="widget-title">Recent Posts</h3>
     <div class="widget">
       <ul>
+        
+          <li>
+            <a href="/2024/04/15/VPD/">VPD</a>
+          </li>
         
           <li>
             <a href="/2024/04/14/Block-Chain/">Block Chain</a>
